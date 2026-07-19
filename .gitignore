@@ -1,0 +1,207 @@
+# =============================================================================
+# AirSense — Comprehensive .gitignore
+# Generated: 2026-07-19
+# RULE: If in doubt, exclude it. Never commit secrets or credentials.
+# =============================================================================
+
+# =============================================================================
+# SECRETS & CREDENTIALS — NEVER COMMIT
+# =============================================================================
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+secrets/
+**/secrets/
+*service-account*.json
+**/service-account*.json
+*firebase-adminsdk*.json
+*credentials*.json
+*secrets*.json
+
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.crt
+*.cer
+*.pub
+
+# =============================================================================
+# LOGS — All variants
+# =============================================================================
+logs/
+*.log
+*.err.log
+*.out.log
+*.run.log
+*.combined.log
+*.verify.log
+mongod-*.log
+hs_err_pid*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =============================================================================
+# FRONTEND BUILD
+# =============================================================================
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# =============================================================================
+# BACKEND BUILD — Maven / Spring Boot
+# =============================================================================
+backend/target/
+*.jar
+*.war
+*.ear
+*.class
+.mvn/wrapper/maven-wrapper.jar
+
+# =============================================================================
+# PYTHON / AI SERVICE
+# =============================================================================
+venv/
+.venv/
+**/venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+**/.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# =============================================================================
+# ML MODEL ARTIFACTS
+# =============================================================================
+*.joblib
+*.pkl
+*.pickle
+*.onnx
+*.pt
+*.pth
+*.h5
+*.keras
+*.model
+*.bin
+
+# =============================================================================
+# DATASET FILES
+# =============================================================================
+*.xlsx
+*.xls
+*.csv
+*.parquet
+*.db
+*.sqlite
+*.sqlite3
+
+# =============================================================================
+# DATABASE DUMPS & BACKUPS
+# =============================================================================
+MongoBackup/
+backups/
+dump/
+*.dump
+*.bson
+*.archive
+*.gz
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+
+# =============================================================================
+# SCREENSHOTS & IMAGES
+# =============================================================================
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.bmp
+*.tiff
+*.ico
+
+# Explicitly re-allow SVG architecture diagrams if committed to docs
+# !docs/architecture-diagram.svg
+
+# =============================================================================
+# BROWSER / TEST ARTIFACTS
+# =============================================================================
+playwright-report/
+test-results/
+coverage/
+screenshots/
+.chrome-*/
+.tmp-chrome-*/
+.chrome-cdp-*/
+chrome-acceptance.*
+forecast-browser-*.png
+verification-*.png
+final-*.png
+lucknow-*.png
+debug-*.png
+debug.log
+
+# =============================================================================
+# AGENT / TOOL / TEMP DIRECTORIES
+# =============================================================================
+.agents/
+.tools/
+artifacts/
+.codex*/
+.codex-chrome-*/
+
+# =============================================================================
+# SCRATCH / TEMPORARY FILES
+# =============================================================================
+tmp/
+tmp_*.py
+out.txt
+script.md
+*.local
+*.pid
+*.sw?
+
+# =============================================================================
+# OS & EDITOR
+# =============================================================================
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# =============================================================================
+# MISC TEST & QA OUTPUT
+# =============================================================================
+*.dom.html
+*.err
+mongod-final-*.log
+mongod-local-*.log
