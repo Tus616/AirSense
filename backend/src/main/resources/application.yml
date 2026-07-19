@@ -1,0 +1,229 @@
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+      - optional:file:backend/.env[.properties]
+  application:
+    name: airsense-api
+  autoconfigure:
+    exclude:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/airsense}
+      auto-index-creation: false
+
+# AI Service Configuration
+ai:
+  service:
+    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
+
+# JWT Configuration
+app:
+  jwt:
+    secret: ${JWT_SECRET:Y2hhbmdlLXRoaXMtaW4tcHJvZHVjdGlvbi10by1hLWxvbmctcmFuZG9tLXNlY3JldC1rZXktYXQtbGVhc3QtMjU2LWJpdHM=}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+# Gemini Advisory Engine Configuration
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-2.5-flash}
+    timeout-ms: ${GEMINI_TIMEOUT_MS:30000}
+    max-retries: ${GEMINI_MAX_RETRIES:2}
+
+openweather:
+  api:
+    key: ${OPENWEATHER_API_KEY:}
+  base:
+    url: ${OPENWEATHER_BASE_URL:https://api.openweathermap.org/data/2.5}
+  request-timeout-seconds: ${OPENWEATHER_REQUEST_TIMEOUT_SECONDS:10}
+
+iqair:
+  api:
+    key: ${IQAIR_API_KEY:}
+  base-url: ${IQAIR_BASE_URL:https://api.airvisual.com}
+  cache-ttl-seconds: ${IQAIR_CACHE_TTL_SECONDS:300}
+  request-timeout-seconds: ${IQAIR_REQUEST_TIMEOUT_SECONDS:10}
+
+nominatim:
+  base-url: ${NOMINATIM_BASE_URL:https://nominatim.openstreetmap.org}
+  user-agent: ${NOMINATIM_USER_AGENT:ETAI-AirSense/1.0 (local-development)}
+
+data-gov-in:
+  api-key: ${DATA_GOV_IN_API_KEY:${CPCB_DATA_GOV_IN_API_KEY:}}
+  base-url: ${DATA_GOV_IN_BASE_URL:https://api.data.gov.in/resource}
+  cpcb-resource-id: ${DATA_GOV_IN_CPCB_RESOURCE_ID:3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69}
+
+cpcb:
+  data-gov:
+    api-key: ${CPCB_DATA_GOV_API_KEY:${CPCB_DATA_GOV_IN_API_KEY:${DATA_GOV_IN_API_KEY:}}}
+  resource-id: ${CPCB_RESOURCE_ID:${DATA_GOV_IN_CPCB_RESOURCE_ID:3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69}}
+  base-url: ${CPCB_BASE_URL:https://api.data.gov.in/resource}
+  freshness-minutes: ${CPCB_STALE_AFTER_MINUTES:${CPCB_FRESHNESS_MINUTES:180}}
+  cache-ttl-seconds: ${CPCB_CACHE_TTL_SECONDS:300}
+  max-station-distance-km: ${CPCB_MAX_STATION_DISTANCE_KM:50}
+  request-timeout-seconds: ${CPCB_REQUEST_TIMEOUT_SECONDS:10}
+
+current-aqi:
+  cpcb:
+    stale-after-minutes: ${CPCB_STALE_AFTER_MINUTES:180}
+    max-station-distance-km: ${CPCB_MAX_STATION_DISTANCE_KM:50}
+    request-timeout-seconds: ${CPCB_REQUEST_TIMEOUT_SECONDS:10}
+  iqair:
+    request-timeout-seconds: ${IQAIR_REQUEST_TIMEOUT_SECONDS:10}
+  openweather:
+    request-timeout-seconds: ${OPENWEATHER_REQUEST_TIMEOUT_SECONDS:10}
+
+air-quality:
+  index-initialization-enabled: ${AIR_QUALITY_INDEX_INITIALIZATION_ENABLED:true}
+  demo-data-enabled: ${DEMO_DATA_ENABLED:false}
+  location-key-version: ${AIR_QUALITY_LOCATION_KEY_VERSION:v2}
+  location-coordinate-precision: ${AIR_QUALITY_LOCATION_COORDINATE_PRECISION:3}
+  location-key-migration-enabled: ${AIR_QUALITY_LOCATION_KEY_MIGRATION_ENABLED:false}
+
+historical:
+  ingestion-enabled: ${HISTORICAL_INGESTION_ENABLED:true}
+  ingestion-interval-minutes: ${HISTORICAL_INGESTION_INTERVAL_MINUTES:60}
+  retention-days: ${HISTORICAL_RETENTION_DAYS:365}
+  location-refresh-limit: ${HISTORICAL_LOCATION_REFRESH_LIMIT:100}
+  min-request-gap-ms: ${HISTORICAL_MIN_REQUEST_GAP_MS:500}
+  stale-after-minutes: ${CPCB_STALE_AFTER_MINUTES:180}
+  provider-timestamp-future-tolerance-minutes: ${HISTORICAL_PROVIDER_TIMESTAMP_FUTURE_TOLERANCE_MINUTES:360}
+
+forecast:
+  engine:
+    history-window-hours: ${FORECAST_HISTORY_WINDOW_HOURS:168}
+    min-valid-observations: ${FORECAST_MIN_VALID_OBSERVATIONS:12}
+    min-observations-24h: ${FORECAST_MIN_OBSERVATIONS_24H:24}
+    min-observations-48h: ${FORECAST_MIN_OBSERVATIONS_48H:48}
+    min-observations-72h: ${FORECAST_MIN_OBSERVATIONS_72H:72}
+    min-coverage-hours-24h: ${FORECAST_MIN_COVERAGE_HOURS_24H:18}
+    min-coverage-hours-48h: ${FORECAST_MIN_COVERAGE_HOURS_48H:36}
+    min-coverage-hours-72h: ${FORECAST_MIN_COVERAGE_HOURS_72H:60}
+    preferred-observations: ${FORECAST_PREFERRED_OBSERVATIONS:48}
+    preferred-observations-24h: ${FORECAST_PREFERRED_OBSERVATIONS_24H:48}
+    preferred-observations-48h: ${FORECAST_PREFERRED_OBSERVATIONS_48H:72}
+    preferred-observations-72h: ${FORECAST_PREFERRED_OBSERVATIONS_72H:120}
+    max-observation-gap-hours: ${FORECAST_MAX_OBSERVATION_GAP_HOURS:6}
+    current-data-max-age-minutes: ${FORECAST_CURRENT_DATA_MAX_AGE_MINUTES:180}
+    enable-trend-weather-engine: ${FORECAST_ENABLE_TREND_WEATHER_ENGINE:true}
+    enable-persistence-baseline: ${FORECAST_ENABLE_PERSISTENCE_BASELINE:true}
+    confidence-floor: ${FORECAST_CONFIDENCE_FLOOR:0.20}
+    model-version: ${FORECAST_MODEL_VERSION:trend-weather-v1}
+    low-wind-threshold-mps: ${FORECAST_LOW_WIND_THRESHOLD_MPS:1.5}
+    high-wind-threshold-mps: ${FORECAST_HIGH_WIND_THRESHOLD_MPS:5.0}
+    low-wind-increase-per-day: ${FORECAST_LOW_WIND_INCREASE_PER_DAY:8.0}
+    high-wind-decrease-per-day: ${FORECAST_HIGH_WIND_DECREASE_PER_DAY:6.0}
+    rainfall-decrease-per-mm: ${FORECAST_RAINFALL_DECREASE_PER_MM:3.0}
+    high-humidity-threshold-percent: ${FORECAST_HIGH_HUMIDITY_THRESHOLD_PERCENT:75.0}
+    high-humidity-increase-per-day: ${FORECAST_HIGH_HUMIDITY_INCREASE_PER_DAY:4.0}
+    evaluation-tolerance-minutes: ${FORECAST_EVALUATION_TOLERANCE_MINUTES:120}
+    evaluation-enabled: ${FORECAST_EVALUATION_ENABLED:true}
+    metrics-min-samples: ${FORECAST_METRICS_MIN_SAMPLES:10}
+    metrics-preferred-samples: ${FORECAST_METRICS_PREFERRED_SAMPLES:30}
+  ml:
+    enabled: ${ML_FORECAST_ENABLED:false}
+    service-url: ${ML_FORECAST_SERVICE_URL:${AI_SERVICE_BASE_URL:http://localhost:8000}}
+    timeout-seconds: ${ML_FORECAST_TIMEOUT_SECONDS:5}
+    model-scope: ${ML_FORECAST_MODEL_SCOPE:GLOBAL}
+    min-samples: ${ML_MODEL_PROMOTION_MIN_SAMPLES:200}
+    min-rmse-improvement-percent: ${ML_MODEL_PROMOTION_MIN_RMSE_IMPROVEMENT_PERCENT:5}
+    max-absolute-bias: ${ML_MODEL_MAX_ABSOLUTE_BIAS:20}
+  retraining:
+    enabled: ${FORECAST_RETRAINING_ENABLED:true}
+    daily-quality-cron: ${FORECAST_RETRAINING_DAILY_QUALITY_CRON:0 15 1 * * *}
+    training-cron: ${FORECAST_RETRAINING_CRON:0 30 2 ? * SUN}
+    schedule: ${FORECAST_RETRAINING_SCHEDULE:weekly}
+    ai-service-directory: ${FORECAST_RETRAINING_AI_SERVICE_DIR:../ai-service}
+    python-executable: ${FORECAST_RETRAINING_PYTHON:../ai-service/venv/Scripts/python.exe}
+    model-dir: ${FORECAST_RETRAINING_MODEL_DIR:models}
+    aqi-standard: ${FORECAST_RETRAINING_AQI_STANDARD:INDIA_NAQI}
+    scopes: ${FORECAST_RETRAINING_SCOPES:GLOBAL_COLD_START,GLOBAL_SHORT_HISTORY,GLOBAL_MEDIUM_HISTORY,GLOBAL_FULL_HISTORY}
+    horizons: ${FORECAST_RETRAINING_HORIZONS:24,48,72}
+    max-live-gap-hours: ${FORECAST_RETRAINING_MAX_LIVE_GAP_HOURS:1.5}
+    min-live-contiguous-hours: ${FORECAST_RETRAINING_MIN_LIVE_CONTIGUOUS_HOURS:73}
+    timeout-minutes: ${FORECAST_RETRAINING_TIMEOUT_MINUTES:240}
+
+diagnostics:
+  cpcb:
+    freshness-minutes: ${CPCB_FRESHNESS_MINUTES:180}
+
+google:
+  application:
+    credentials: ${GOOGLE_APPLICATION_CREDENTIALS:}
+  cloud:
+    project:
+      id: ${GOOGLE_CLOUD_PROJECT_ID:}
+
+logging:
+  level:
+    org.springframework.web: INFO
+    org.springframework.web.HttpLogging: INFO
+    org.springframework.web.client.RestTemplate: INFO
+    org.springframework.web.servlet.DispatcherServlet: INFO
+    org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor: INFO
+    org.springframework.web.servlet.mvc.method.annotation.HttpEntityMethodProcessor: INFO
+    org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping: INFO
+
+fusion:
+  cache:
+    default-ttl-seconds: ${FUSION_CACHE_DEFAULT_TTL_SECONDS:120}
+    provider-ttl-seconds:
+      weather: ${FUSION_CACHE_WEATHER_TTL_SECONDS:120}
+      satellite: ${FUSION_CACHE_SATELLITE_TTL_SECONDS:1800}
+      greenCover: ${FUSION_CACHE_GREEN_COVER_TTL_SECONDS:3600}
+      aqi: ${FUSION_CACHE_AQI_TTL_SECONDS:120}
+
+geospatial:
+  cache-ttl-seconds: ${GEOSPATIAL_CACHE_TTL_SECONDS:300}
+  synthetic-grid-size-degrees: ${GEOSPATIAL_SYNTHETIC_GRID_SIZE_DEGREES:0.025}
+
+attribution:
+  enabled: ${ATTRIBUTION_ENABLED:true}
+  engine-version: ${ATTRIBUTION_ENGINE_VERSION:source-attribution-v1}
+  local-radius-km: ${ATTRIBUTION_LOCAL_RADIUS_KM:5}
+  regional-radius-km: ${ATTRIBUTION_REGIONAL_RADIUS_KM:50}
+  fire-radius-km: ${ATTRIBUTION_FIRE_RADIUS_KM:300}
+  geospatial-cache-minutes: ${ATTRIBUTION_GEOSPATIAL_CACHE_MINUTES:${ATTRIBUTION_GEOPATIAL_CACHE_MINUTES:1440}}
+  fire-cache-minutes: ${ATTRIBUTION_FIRE_CACHE_MINUTES:60}
+  satellite-cache-minutes: ${ATTRIBUTION_SATELLITE_CACHE_MINUTES:360}
+  result-cache-minutes: ${ATTRIBUTION_RESULT_CACHE_MINUTES:30}
+  http-timeout-seconds: ${ATTRIBUTION_HTTP_TIMEOUT_SECONDS:15}
+  max-retries: ${ATTRIBUTION_MAX_RETRIES:2}
+  nasa-firms-api-key: ${NASA_FIRMS_API_KEY:}
+  nasa-firms-base-url: ${NASA_FIRMS_BASE_URL:https://firms.modaps.eosdis.nasa.gov/api/area/csv}
+  elevated-no2: ${ATTRIBUTION_ELEVATED_NO2:40}
+  elevated-so2: ${ATTRIBUTION_ELEVATED_SO2:20}
+  elevated-co: ${ATTRIBUTION_ELEVATED_CO:1.0}
+  elevated-o3: ${ATTRIBUTION_ELEVATED_O3:80}
+  pm10-dominance-ratio: ${ATTRIBUTION_PM10_DOMINANCE_RATIO:1.35}
+  dry-humidity-percent: ${ATTRIBUTION_DRY_HUMIDITY_PERCENT:40}
+  rainfall-washout-mm: ${ATTRIBUTION_RAINFALL_WASHOUT_MM:0.5}
+  low-wind-mps: ${ATTRIBUTION_LOW_WIND_MPS:2.0}
+  strong-wind-mps: ${ATTRIBUTION_STRONG_WIND_MPS:5.0}
+  high-road-density-km-per-sq-km: ${ATTRIBUTION_HIGH_ROAD_DENSITY_KM_PER_SQ_KM:1.0}
+  near-major-road-km: ${ATTRIBUTION_NEAR_MAJOR_ROAD_KM:0.5}
+  stale-evidence-hours: ${ATTRIBUTION_STALE_EVIDENCE_HOURS:24}
+  minimum-known-budget: ${ATTRIBUTION_MINIMUM_KNOWN_BUDGET:15}
+
+real-data:
+  open-street-map:
+    enabled: ${OSM_ENABLED:true}
+    overpass-url: ${OSM_OVERPASS_URL:https://overpass-api.de/api/interpreter}
+    radius-meters: ${OSM_RADIUS_METERS:8000}
+    timeout-seconds: ${OSM_TIMEOUT_SECONDS:18}
+  geojson:
+    industrial: ${INDUSTRIAL_GEOJSON_PATH:}
+    construction: ${CONSTRUCTION_GEOJSON_PATH:}
+    adminBoundaries: ${ADMIN_BOUNDARIES_GEOJSON_PATH:}
+    parks: ${PARKS_GEOJSON_PATH:}
+    water: ${WATER_BODIES_GEOJSON_PATH:}
+
+# Feature Flags
+features:
+  voice-assistant: ${FEATURE_VOICE_ASSISTANT:true}
+  policy-simulation: ${FEATURE_POLICY_SIMULATION:true}
