@@ -1,0 +1,41 @@
+body {
+  font-family: var(--font-body);
+  font-weight: 450;
+  letter-spacing: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+button,
+select,
+input,
+textarea,
+.uqi-eyebrow,
+.uqi-chip,
+.uqi-status-badge,
+.uqi-nav,
+.role-switcher,
+.citizen-tabs,
+.citizen-badge,
+.uqi-definition-grid dt,
+.citizen-definition-grid dt,
+.uqi-aqi-value,
+.uqi-horizon-card__value,
+.uqi-table th {
+  font-family: var(--font-tech);
+}
+
+p,
+small,
+.uqi-note,
+.uqi-disclaimer,
+.uqi-lead,
+.citizen-card p,
+.citizen-hero p,
+.citizen-empty,
+.uqi-action-item span {
+  font-family: var(--font-body);
+  font-weight: 450;
+}

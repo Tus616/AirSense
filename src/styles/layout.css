@@ -1,0 +1,46 @@
+.uqi-overview-command-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  align-items: start;
+  grid-auto-rows: auto;
+}
+
+.uqi-command-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  align-items: start;
+  grid-auto-rows: auto;
+}
+
+.uqi-command-row--insights {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.uqi-command-row--operations {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.uqi-map-command-card {
+  width: 100%;
+}
+
+@media (max-width: 1399px) {
+  .uqi-overview-command-grid,
+  .uqi-command-row,
+  .uqi-command-row--insights,
+  .uqi-command-row--operations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 899px) {
+  .uqi-overview-command-grid,
+  .uqi-command-row,
+  .uqi-command-row--insights,
+  .uqi-command-row--operations,
+  .uqi-command-row--bottom {
+    grid-template-columns: 1fr;
+  }
+}

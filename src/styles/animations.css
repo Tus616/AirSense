@@ -1,0 +1,29 @@
+@keyframes uqiGlowPulse {
+  0%, 100% { box-shadow: 0 18px 42px rgba(15, 143, 131, 0.22); }
+  50% { box-shadow: 0 20px 58px rgba(45, 212, 191, 0.36); }
+}
+
+@keyframes uqiGaugeSweep {
+  from { stroke-dashoffset: var(--gauge-size); }
+  to { stroke-dashoffset: var(--gauge-offset); }
+}
+
+@keyframes uqiBarGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes uqiFloatIdle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
