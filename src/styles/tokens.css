@@ -1,0 +1,63 @@
+:root {
+  --font-tech: "Space Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+  --font-body: "Manrope", "Inter", "Segoe UI", system-ui, sans-serif;
+  --bg-app: #f4f7fb;
+  --bg-surface: #ffffff;
+  --bg-surface-tint: #fbfffe;
+  --bg-subtle: #f8fafc;
+  --text-primary: #0b1730;
+  --text-secondary: #40516b;
+  --text-muted: #64748b;
+  --border-soft: #dce7f1;
+  --primary: #0f8f83;
+  --primary-dark: #08766d;
+  --primary-soft: #e6f6f4;
+  --secondary: #2563eb;
+  --cyan-glow: rgba(45, 212, 191, 0.22);
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #dc2626;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+  --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 14px 34px rgba(15, 23, 42, 0.09);
+  --shadow-lg: 0 24px 70px rgba(15, 23, 42, 0.14);
+  --highlight-top: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+:root[data-theme="dark"] {
+  --bg-app: #08111f;
+  --bg-surface: #101c2d;
+  --bg-surface-tint: #132437;
+  --bg-subtle: #0c1727;
+  --text-primary: #eef6ff;
+  --text-secondary: #b9c7d8;
+  --text-muted: #8fa2b8;
+  --color-surface: #101c2d;
+  --color-surface-subtle: #0c1727;
+  --color-text: #eef6ff;
+  --color-text-secondary: #b9c7d8;
+  --color-text-muted: #8fa2b8;
+  --color-border: #26384d;
+  --color-primary: #2dd4bf;
+  --color-primary-hover: #14b8a6;
+  --color-primary-glow: rgba(45, 212, 191, 0.28);
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #fb7185;
+  --border-soft: #26384d;
+  --primary: #2dd4bf;
+  --primary-dark: #14b8a6;
+  --primary-soft: rgba(45, 212, 191, 0.14);
+  --secondary: #7aa2ff;
+  --cyan-glow: rgba(45, 212, 191, 0.28);
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.24);
+  --shadow-md: 0 14px 34px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.44);
+  --highlight-top: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
