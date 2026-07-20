@@ -1,0 +1,205 @@
+/* ============================================================================
+   AirSense — Design Tokens & Global Reset
+   ============================================================================ */
+
+:root {
+  /* ---- Color Palette ---- */
+  --color-bg:          #0f1117;
+  --color-surface:     #1a1d27;
+  --color-card:        rgba(34, 38, 50, 0.5);
+  --color-card-border: rgba(99, 102, 241, 0.15);
+  --color-primary:     #6366f1;
+  --color-primary-glow: rgba(99, 102, 241, 0.25);
+  --color-secondary:   #8b5cf6;
+  --color-accent:      #22d3ee;
+  --color-text:        #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted:  #64748b;
+  --color-border:      rgba(148, 163, 184, 0.12);
+  --color-error:       #f43f5e;
+  --color-success:     #22c55e;
+  --color-warning:     #f59e0b;
+
+  /* ---- AQI Colors ---- */
+  --aqi-good:          #55a84f;
+  --aqi-satisfactory:  #a3c853;
+  --aqi-moderate:      #fff833;
+  --aqi-poor:          #f29c33;
+  --aqi-very-poor:     #e93f33;
+  --aqi-severe:        #af2d24;
+
+  /* ---- Spacing ---- */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  /* ---- Border Radius ---- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* ---- Typography ---- */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 2rem;
+  --font-size-4xl: 2.5rem;
+
+  /* ---- Shadows ---- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px var(--color-primary-glow);
+
+  /* ---- Transitions ---- */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+}
+
+/* ---- CSS Reset ---- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+a:hover { color: var(--color-secondary); }
+
+img { max-width: 100%; height: auto; }
+
+ul, ol { list-style: none; }
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ---- Utility: Glass Card ---- */
+.glass-card {
+  background: var(--color-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+.glass-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+/* ---- Utility: Buttons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  transition: all var(--transition-base);
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn--primary {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: white;
+  box-shadow: 0 4px 12px var(--color-primary-glow);
+}
+.btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--color-primary-glow);
+  color: white;
+}
+.btn--secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+.btn--secondary:hover {
+  background: var(--color-card);
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+.btn--outline {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+.btn--outline:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-glow);
+}
+.btn--full { width: 100%; justify-content: center; }
+
+/* ---- Utility: Section Title ---- */
+.section-title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  margin-bottom: var(--space-lg);
+  color: var(--color-text);
+}
+
+/* ---- Utility: Tab Buttons ---- */
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all var(--transition-base);
+}
+.tab-btn:hover {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+.tab-btn--active {
+  color: var(--color-primary);
+  background: var(--color-primary-glow);
+  border-color: var(--color-primary);
+}
