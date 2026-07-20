@@ -1,0 +1,9 @@
+{
+  "aqiStandard": "INDIA_NAQI",
+  "modelDir": "forecasting/models",
+  "modelScope": "GLOBAL",
+  "minSamples": 200,
+  "minRmseImprovementPercent": 5,
+  "maxAbsoluteBias": 20,
+  "writeRegistry": true
+}
