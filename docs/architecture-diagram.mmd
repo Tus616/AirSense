@@ -1,0 +1,78 @@
+graph TD
+    %% Styling
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef db fill:#fdb462,stroke:#d95f02,stroke-width:2px,color:#000;
+    classDef frontend fill:#8dd3c7,stroke:#006d2c,stroke-width:2px,color:#000;
+    classDef backend fill:#80b1d3,stroke:#08519c,stroke-width:2px,color:#000;
+    classDef model fill:#bebada,stroke:#54278f,stroke-width:2px,color:#000;
+    classDef external fill:#ffffb3,stroke:#cccc00,stroke-width:2px,color:#000;
+
+    %% Data Sources
+    subgraph Data Sources
+        IoT[IoT Sensor Arrays]
+        Sat[Satellite Thermal Data]
+        Traffic[Traffic APIs]
+    end
+
+    %% Frontend
+    subgraph Frontend
+        AdminDash[React Gov Dashboard]:::frontend
+        CitizenApp[React Citizen App / Kiosk]:::frontend
+    end
+
+    %% Backend API
+    subgraph Spring Boot Backend
+        API[REST Controllers]:::backend
+        Sync[Data Ingestion Service]:::backend
+        Harness[Evaluation Harness Service]:::backend
+        EnforcementSvc[Enforcement Intelligence]:::backend
+        AdvisorySvc[Citizen Advisory Service]:::backend
+    end
+
+    %% DB
+    subgraph Database
+        MongoDB[(MongoDB Collections)]:::db
+        MongoDB -.->|SensorData, Permits, Predictions, Advisories| MongoDB
+    end
+
+    %% AI Models
+    subgraph AI/ML Layer
+        XGB[XGBoost Forecasting]:::model
+        Attr[Attribution Engine]:::model
+        Sim[Policy Simulator Agents]:::model
+    end
+
+    %% External
+    Gemini[Gemini LLM]:::external
+
+    %% Flow
+    IoT --> Sync
+    Sat --> Sync
+    Traffic --> Sync
+    Sync --> MongoDB
+
+    MongoDB --> XGB
+    MongoDB --> Attr
+    XGB --> MongoDB
+    Attr --> MongoDB
+
+    MongoDB --> EnforcementSvc
+    EnforcementSvc --> Gemini
+    Gemini --> EnforcementSvc
+    EnforcementSvc --> MongoDB
+
+    MongoDB --> AdvisorySvc
+    AdvisorySvc --> Gemini
+    Gemini --> AdvisorySvc
+    AdvisorySvc --> MongoDB
+
+    API <--> MongoDB
+    AdminDash <--> API
+    CitizenApp <--> API
+
+    AdminDash --> Sim
+    Sim --> Gemini
+    Gemini --> Sim
+
+    AdminDash --> Harness
+    Harness --> MongoDB
