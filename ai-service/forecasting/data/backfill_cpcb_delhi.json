@@ -1,0 +1,12 @@
+{
+  "inserted": 45,
+  "updated": 0,
+  "skipped": 0,
+  "invalid": 1,
+  "normalizedRecordCount": 45,
+  "source": "CPCB_CAAQMS",
+  "city": "delhi",
+  "start": null,
+  "end": null,
+  "rawRecordCount": 315
+}

@@ -1,0 +1,197 @@
+{
+  "stations": {
+    "in:19.057:72.859": {
+      "stationName": "Bandra Kurla Complex, Mumbai - IITM",
+      "city": "Mumbai",
+      "importedRows": 4433,
+      "uniqueHourlyObservations": 4433,
+      "cpcbMeasuredRows": 4433,
+      "cpcbDerivedRows": 0,
+      "camsModelledRows": 0,
+      "weatherRows": 1968,
+      "oldestTimestamp": "2025-04-08 04:00:00+00:00",
+      "latestTimestamp": "2025-12-31 17:00:00+00:00",
+      "missingPollutantPercent": {
+        "pm25": 100.0,
+        "pm10": 100.0,
+        "no2": 100.0,
+        "so2": 100.0,
+        "co": 100.0,
+        "o3": 100.0,
+        "nh3": 100.0
+      },
+      "duplicateCount": 0,
+      "largestGapHours": 777.0,
+      "gapsOverOneHour": 50,
+      "validTargets": {
+        "24h": 4001,
+        "48h": 3795,
+        "72h": 3654
+      },
+      "weatherCoveragePercent": 0.0,
+      "aqiCategoryDistribution": {
+        "SATISFACTORY": 2553,
+        "MODERATE": 1121,
+        "GOOD": 452,
+        "POOR": 192,
+        "VERY_POOR": 115,
+        "SEVERE": 0
+      }
+    },
+    "in:26.863:80.999": {
+      "stationName": "Gomti Nagar, Lucknow - UPPCB",
+      "city": "Lucknow",
+      "importedRows": 8613,
+      "uniqueHourlyObservations": 8613,
+      "cpcbMeasuredRows": 8613,
+      "cpcbDerivedRows": 0,
+      "camsModelledRows": 0,
+      "weatherRows": 8760,
+      "oldestTimestamp": "2024-12-31 18:00:00+00:00",
+      "latestTimestamp": "2025-12-31 17:00:00+00:00",
+      "missingPollutantPercent": {
+        "pm25": 100.0,
+        "pm10": 100.0,
+        "no2": 100.0,
+        "so2": 100.0,
+        "co": 100.0,
+        "o3": 100.0,
+        "nh3": 100.0
+      },
+      "duplicateCount": 0,
+      "largestGapHours": 29.0,
+      "gapsOverOneHour": 56,
+      "validTargets": {
+        "24h": 8449,
+        "48h": 8445,
+        "72h": 8422
+      },
+      "weatherCoveragePercent": 99.93,
+      "aqiCategoryDistribution": {
+        "MODERATE": 3767,
+        "SATISFACTORY": 2433,
+        "GOOD": 1710,
+        "POOR": 689,
+        "VERY_POOR": 14,
+        "SEVERE": 0
+      }
+    },
+    "in:28.545:77.323": {
+      "stationName": "Sector - 125, Noida - UPPCB",
+      "city": "Noida",
+      "importedRows": 8760,
+      "uniqueHourlyObservations": 8760,
+      "cpcbMeasuredRows": 0,
+      "cpcbDerivedRows": 0,
+      "camsModelledRows": 8760,
+      "weatherRows": 8760,
+      "oldestTimestamp": "2025-01-01 00:00:00+00:00",
+      "latestTimestamp": "2025-12-31 23:00:00+00:00",
+      "missingPollutantPercent": {
+        "pm25": 0.0,
+        "pm10": 0.0,
+        "no2": 0.0,
+        "so2": 0.0,
+        "co": 0.0,
+        "o3": 0.0,
+        "nh3": 100.0
+      },
+      "duplicateCount": 0,
+      "largestGapHours": 1.0,
+      "gapsOverOneHour": 0,
+      "validTargets": {
+        "24h": 0,
+        "48h": 0,
+        "72h": 0
+      },
+      "weatherCoveragePercent": 100.0,
+      "aqiCategoryDistribution": {
+        "VERY_POOR": 2456,
+        "MODERATE": 2258,
+        "POOR": 2127,
+        "SATISFACTORY": 1040,
+        "SEVERE": 798,
+        "GOOD": 48
+      }
+    },
+    "in:28.629:77.241": {
+      "stationName": "ITO, Delhi - CPCB",
+      "city": "Delhi",
+      "importedRows": 16941,
+      "uniqueHourlyObservations": 8765,
+      "cpcbMeasuredRows": 3891,
+      "cpcbDerivedRows": 0,
+      "camsModelledRows": 4875,
+      "weatherRows": 8760,
+      "oldestTimestamp": "2024-12-31 19:00:00+00:00",
+      "latestTimestamp": "2025-12-31 23:00:00+00:00",
+      "missingPollutantPercent": {
+        "pm25": 44.39,
+        "pm10": 44.39,
+        "no2": 44.39,
+        "so2": 44.39,
+        "co": 44.39,
+        "o3": 44.39,
+        "nh3": 100.0
+      },
+      "duplicateCount": 8175,
+      "largestGapHours": 1.0,
+      "gapsOverOneHour": 0,
+      "validTargets": {
+        "24h": 3878,
+        "48h": 3868,
+        "72h": 3853
+      },
+      "weatherCoveragePercent": 99.94,
+      "aqiCategoryDistribution": {
+        "MODERATE": 2951,
+        "POOR": 1787,
+        "SATISFACTORY": 1784,
+        "VERY_POOR": 1647,
+        "SEVERE": 587,
+        "GOOD": 9
+      }
+    },
+    "in:28.999:77.759": {
+      "stationName": "Ganga Nagar, Meerut - UPPCB",
+      "city": "Meerut",
+      "importedRows": 8760,
+      "uniqueHourlyObservations": 8760,
+      "cpcbMeasuredRows": 0,
+      "cpcbDerivedRows": 0,
+      "camsModelledRows": 8760,
+      "weatherRows": 8760,
+      "oldestTimestamp": "2025-01-01 00:00:00+00:00",
+      "latestTimestamp": "2025-12-31 23:00:00+00:00",
+      "missingPollutantPercent": {
+        "pm25": 0.0,
+        "pm10": 0.0,
+        "no2": 0.0,
+        "so2": 0.0,
+        "co": 0.0,
+        "o3": 0.0,
+        "nh3": 100.0
+      },
+      "duplicateCount": 0,
+      "largestGapHours": 1.0,
+      "gapsOverOneHour": 0,
+      "validTargets": {
+        "24h": 0,
+        "48h": 0,
+        "72h": 0
+      },
+      "weatherCoveragePercent": 100.0,
+      "aqiCategoryDistribution": {
+        "MODERATE": 3360,
+        "POOR": 2232,
+        "VERY_POOR": 1426,
+        "SATISFACTORY": 1324,
+        "SEVERE": 385,
+        "GOOD": 26
+      }
+    }
+  },
+  "generatedAt": "2026-07-12T20:28:09.596493+00:00",
+  "totalStations": 5,
+  "totalRows": 47507
+}

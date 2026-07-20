@@ -1,0 +1,6 @@
+{
+  "modelDir": "models",
+  "aqiStandard": "INDIA_NAQI",
+  "writeRegistry": true,
+  "scopes": ["GLOBAL_FULL_HISTORY"]
+}

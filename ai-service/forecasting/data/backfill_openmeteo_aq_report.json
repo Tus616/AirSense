@@ -1,0 +1,14 @@
+{
+  "inserted": 0,
+  "updated": 8760,
+  "skipped": 0,
+  "invalid": 33,
+  "total": 8760,
+  "source": "OPEN_METEO_AQ",
+  "station": "Sector - 125, Noida - UPPCB",
+  "city": "Noida",
+  "lat": 28.545,
+  "lon": 77.323,
+  "start": "2025-01-01",
+  "end": "2025-12-31"
+}
