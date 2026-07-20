@@ -1,0 +1,5 @@
+{
+  "modelDir": "models",
+  "aqiStandard": "INDIA_NAQI",
+  "writeRegistry": true
+}
