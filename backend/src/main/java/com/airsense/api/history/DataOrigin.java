@@ -1,0 +1,12 @@
+package com.airsense.api.history;
+
+public enum DataOrigin {
+    OBSERVED,
+    HISTORICAL_TRAINING_ARCHIVE,
+    LIVE_OPERATIONAL_HISTORY,
+    DERIVED_FROM_REAL_DATA,
+    FORECAST,
+    PERSISTENCE_BASELINE,
+    SYNTHETIC_DEMO,
+    UNAVAILABLE
+}
