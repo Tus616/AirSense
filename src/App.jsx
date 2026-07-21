@@ -3,6 +3,7 @@ import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
 import DecisionDashboard from "./pages/DecisionDashboard";
 import CitizenDashboard from "./pages/CitizenDashboard";
 import KioskDisplay from "./pages/KioskDisplay";
@@ -15,6 +16,8 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+
           <Route
             path="/gov/*"
             element={
@@ -23,6 +26,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/citizen"
             element={
@@ -32,6 +36,7 @@ export default function App() {
             }
           />
         </Route>
+
         <Route path="/kiosk/:wardId" element={<KioskDisplay />} />
       </Routes>
     </BrowserRouter>

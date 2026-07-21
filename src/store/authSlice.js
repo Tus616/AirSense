@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { loginApi, logoutApi, getMeApi } from "../services/api";
+import { loginApi, registerApi, logoutApi, getMeApi } from "../services/api";
 
 export const loginAsync = createAsyncThunk(
   "auth/loginAsync",
@@ -9,6 +9,19 @@ export const loginAsync = createAsyncThunk(
       return response; // { token, user, role, expiresIn }
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || "Login failed");
+    }
+  }
+);
+export const registerAsync = createAsyncThunk(
+  "auth/registerAsync",
+  async ({ name, email, password }, { rejectWithValue }) => {
+    try {
+      const response = await registerApi(name, email, password);
+      return response;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Registration failed"
+      );
     }
   }
 );
@@ -65,6 +78,21 @@ const authSlice = createSlice({
         state.status = "failed";
         state.error = action.payload;
       })
+      .addCase(registerAsync.pending, (state) => {
+  state.status = "loading";
+  state.error = null;
+})
+.addCase(registerAsync.fulfilled, (state, action) => {
+  state.status = "succeeded";
+  state.user = action.payload.user;
+  state.token = action.payload.token;
+  state.role = action.payload.role;
+  state.isAuthenticated = true;
+})
+.addCase(registerAsync.rejected, (state, action) => {
+  state.status = "failed";
+  state.error = action.payload;
+})
       .addCase(logoutAsync.fulfilled, (state) => {
         state.user = null;
         state.token = null;

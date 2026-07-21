@@ -38,7 +38,10 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
-                .requestMatchers("/api/v1/auth/login").permitAll()
+                .requestMatchers(
+        "/api/v1/auth/login",
+        "/api/v1/auth/register"
+).permitAll()
                 .requestMatchers("/api/v1/aqi/**").permitAll()
                 .requestMatchers("/api/v1/air-quality/**").permitAll()
                 .requestMatchers("/api/v1/air-quality").permitAll()
