@@ -1,0 +1,243 @@
+{
+  "generatedAt": "2026-07-20T11:04:03.379653+00:00",
+  "inclusion": {
+    "rawRows": 76829,
+    "validRows": 72253,
+    "archiveRowsIncluded": 59877,
+    "liveRowsCollected": 535,
+    "liveRowsMatured": 0,
+    "liveRowsRejectedImmature": 535,
+    "newlyCollectedRowsIncluded": 0,
+    "liveRowsIncluded": 0,
+    "liveRowsRejectedQuality": 0,
+    "includedBlocks": 0,
+    "rejectedBlocks": 0,
+    "rejectedStations": {},
+    "maturityCutoff": "2026-07-17T11:04:03.379653+00:00",
+    "maxLiveGapHours": 1.5,
+    "minLiveContiguousHours": 73
+  },
+  "quality": {
+    "rows": 59877,
+    "uniqueHourlyObservations": 26076,
+    "rowsPerLocation": {
+      "in:19.057:72.859": 10166,
+      "in:19.076:72.878": 2,
+      "in:26.847:80.946": 2,
+      "in:26.863:80.999": 25461,
+      "in:28.614:77.209": 6,
+      "in:28.629:77.241": 24240
+    },
+    "stationSummary": {
+      "bandra_kurla_complex_mumbai_iitm": {
+        "rows": 2397,
+        "uniqueHourlyObservations": 2397,
+        "largestGapHours": 777.0,
+        "gapsOverOneHour": 32,
+        "dateRange": [
+          "2025-07-20 11:00:00+00:00",
+          "2025-12-31 17:00:00+00:00"
+        ]
+      },
+      "bandra_kurla_complex_mumbai_mpcb": {
+        "rows": 7769,
+        "uniqueHourlyObservations": 7769,
+        "largestGapHours": 2390.0,
+        "gapsOverOneHour": 74,
+        "dateRange": [
+          "2023-12-31 18:00:00+00:00",
+          "2025-07-17 19:00:00+00:00"
+        ]
+      },
+      "gomti_nagar_lucknow_uppcb": {
+        "rows": 25461,
+        "uniqueHourlyObservations": 25461,
+        "largestGapHours": 118.0,
+        "gapsOverOneHour": 154,
+        "dateRange": [
+          "2022-12-31 18:00:00+00:00",
+          "2025-12-31 17:00:00+00:00"
+        ]
+      },
+      "ito_delhi_cpcb": {
+        "rows": 24240,
+        "uniqueHourlyObservations": 24240,
+        "largestGapHours": 413.0,
+        "gapsOverOneHour": 161,
+        "dateRange": [
+          "2022-12-31 18:00:00+00:00",
+          "2025-12-31 17:00:00+00:00"
+        ]
+      },
+      "kurla_mumbai_mpcb": {
+        "rows": 2,
+        "uniqueHourlyObservations": 2,
+        "largestGapHours": 1.0,
+        "gapsOverOneHour": 0,
+        "dateRange": [
+          "2026-07-17 16:00:00+00:00",
+          "2026-07-17 17:00:00+00:00"
+        ]
+      },
+      "lalbagh_lucknow_cpcb": {
+        "rows": 2,
+        "uniqueHourlyObservations": 2,
+        "largestGapHours": 1.0,
+        "gapsOverOneHour": 0,
+        "dateRange": [
+          "2026-07-17 16:00:00+00:00",
+          "2026-07-17 17:00:00+00:00"
+        ]
+      },
+      "talkatora_garden_delhi_dpcc": {
+        "rows": 6,
+        "uniqueHourlyObservations": 6,
+        "largestGapHours": 100.0,
+        "gapsOverOneHour": 3,
+        "dateRange": [
+          "2026-07-12 19:00:00+00:00",
+          "2026-07-17 17:00:00+00:00"
+        ]
+      }
+    },
+    "dateRange": [
+      "2022-12-31 18:00:00+00:00",
+      "2026-07-17 17:00:00+00:00"
+    ],
+    "missingPercent": {
+      "co": 99.98,
+      "currentAqi": 0.0,
+      "nh3": 99.98,
+      "no2": 99.98,
+      "o3": 99.98,
+      "pm10": 99.98,
+      "pm25": 99.98,
+      "so2": 99.98,
+      "weather_temperatureCelsius": 64.88,
+      "weather_humidityPercent": 64.88,
+      "weather_pressureHpa": 64.88,
+      "weather_windSpeedMps": 64.88,
+      "weather_windDirectionDegrees": 64.88,
+      "weather_rainfallMm": 64.88,
+      "weather_cloudCoverPercent": 64.88
+    },
+    "duplicateCount": 0,
+    "largestGapHours": 2390.0,
+    "gapHoursOverOneHour": [
+      178.0,
+      72.0,
+      2.0,
+      2.0,
+      64.0,
+      2.0,
+      2.0,
+      2.0,
+      2.0,
+      2.0,
+      2.0,
+      2.0,
+      2.0,
+      17.0,
+      2.0,
+      2.0,
+      2.0,
+      75.0,
+      96.0,
+      2.0,
+      2.0,
+      2.0,
+      53.0,
+      2.0,
+      2.0,
+      32.0,
+      30.0,
+      2.0,
+      16.0,
+      777.0,
+      96.0,
+      34.0,
+      81.0,
+      45.0,
+      79.0,
+      17.0,
+      2.0,
+      68.0,
+      50.0,
+      25.0,
+      2.0,
+      2.0,
+      3.0,
+      2.0,
+      33.0,
+      17.0,
+      2.0,
+      69.0,
+      3.0,
+      3.0,
+      144.0,
+      79.0,
+      2.0,
+      110.0,
+      114.0,
+      23.0,
+      2.0,
+      35.0,
+      2.0,
+      3.0,
+      144.0,
+      41.0,
+      2.0,
+      233.0,
+      528.0,
+      32.0,
+      386.0,
+      2.0,
+      53.0,
+      2.0,
+      21.0,
+      27.0,
+      2.0,
+      2.0,
+      70.0,
+      26.0,
+      2.0,
+      42.0,
+      2.0,
+      49.0,
+      2.0,
+      2.0,
+      50.0,
+      148.0,
+      77.0,
+      28.0,
+      2.0,
+      2390.0,
+      2.0,
+      2.0,
+      3.0,
+      2.0,
+      114.0,
+      257.0,
+      2.0,
+      35.0,
+      2.0,
+      6.0,
+      18.0,
+      4.0
+    ],
+    "weatherCoveragePercent": 35.12,
+    "validTargetCount": {
+      "24h": 59771,
+      "48h": 59675,
+      "72h": 59579
+    },
+    "aqiCategoryDistribution": {
+      "MODERATE": 21804,
+      "SATISFACTORY": 18512,
+      "POOR": 7180,
+      "GOOD": 5889,
+      "VERY_POOR": 4877,
+      "SEVERE": 1615
+    }
+  }
+}

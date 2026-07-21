@@ -1,0 +1,1368 @@
+{
+  "modelId": "aqi-24h-xgb-GLOBAL_COLD_START-20260718210000",
+  "horizonHours": 24,
+  "modelScope": "GLOBAL_COLD_START",
+  "modelScopeType": "MULTI_STATION_GLOBAL_ML",
+  "forecastScope": "GLOBAL",
+  "stationKey": null,
+  "historyTier": "GLOBAL_COLD_START",
+  "requiredHistoryHours": 0,
+  "aqiStandard": "INDIA_NAQI",
+  "modelFamily": "XGBOOST",
+  "version": "aqi-24h-xgb-GLOBAL_COLD_START-20260718210000",
+  "artifactPath": "models\\aqi-24h-xgb-GLOBAL_COLD_START-20260718210000.joblib",
+  "featureSchemaVersion": "forecasting-feature-schema-v2",
+  "useDeltaTarget": true,
+  "features": [
+    "co",
+    "coUnitHandling",
+    "currentAqi",
+    "latitude",
+    "longitude",
+    "nh3",
+    "no2",
+    "o3",
+    "pm10",
+    "pm25",
+    "so2",
+    "stationId",
+    "stationLatitude",
+    "stationLongitude",
+    "subIndexes",
+    "stationDistanceKm",
+    "temperatureCelsius",
+    "humidityPercent",
+    "pressureHpa",
+    "windSpeedMps",
+    "windDirectionDegrees",
+    "rainfallMm",
+    "openWeatherAqiIndex",
+    "weather_temperatureCelsius",
+    "weather_humidityPercent",
+    "weather_pressureHpa",
+    "weather_windSpeedMps",
+    "weather_windDirectionDegrees",
+    "weather_rainfallMm",
+    "weather_cloudCoverPercent",
+    "pm25_pm10_ratio",
+    "hour",
+    "dayOfWeek",
+    "month",
+    "isWeekend",
+    "season",
+    "hourSin",
+    "hourCos",
+    "dayOfWeekSin",
+    "dayOfWeekCos",
+    "monthSin",
+    "monthCos",
+    "stationLatitudeFeature",
+    "stationLongitudeFeature"
+  ],
+  "requiredFeatures": [
+    "currentAqi",
+    "latitude",
+    "longitude"
+  ],
+  "featureStats": {
+    "co": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "coUnitHandling": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "currentAqi": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 117.0,
+      "p01": 31.0,
+      "p05": 41.0,
+      "p95": 370.0,
+      "p99": 433.0
+    },
+    "latitude": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 26.863,
+      "p01": 19.057,
+      "p05": 19.057,
+      "p95": 28.629,
+      "p99": 28.629
+    },
+    "longitude": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 77.241,
+      "p01": 72.859,
+      "p05": 72.859,
+      "p95": 80.999,
+      "p99": 80.999
+    },
+    "nh3": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "stationId": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "stationLatitude": {
+      "nonNullCount": 49774,
+      "nullCount": 10114,
+      "median": 26.863,
+      "p01": 19.057,
+      "p05": 19.057,
+      "p95": 28.629,
+      "p99": 28.629
+    },
+    "stationLongitude": {
+      "nonNullCount": 49774,
+      "nullCount": 10114,
+      "median": 77.241,
+      "p01": 72.859,
+      "p05": 72.859,
+      "p95": 80.999,
+      "p99": 80.999
+    },
+    "subIndexes": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "stationDistanceKm": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "temperatureCelsius": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "humidityPercent": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pressureHpa": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "windSpeedMps": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "windDirectionDegrees": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "rainfallMm": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "openWeatherAqiIndex": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "weather_temperatureCelsius": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "weather_humidityPercent": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "weather_pressureHpa": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "weather_windSpeedMps": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "weather_windDirectionDegrees": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "weather_rainfallMm": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "weather_cloudCoverPercent": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25_pm10_ratio": {
+      "nonNullCount": 0,
+      "nullCount": 59888,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "hour": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 11.0,
+      "p01": 0.0,
+      "p05": 1.0,
+      "p95": 22.0,
+      "p99": 23.0
+    },
+    "dayOfWeek": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 3.0,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 6.0,
+      "p99": 6.0
+    },
+    "month": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 7.0,
+      "p01": 1.0,
+      "p05": 1.0,
+      "p95": 12.0,
+      "p99": 12.0
+    },
+    "isWeekend": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 0.0,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 1.0,
+      "p99": 1.0
+    },
+    "season": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 3.0,
+      "p01": 1.0,
+      "p05": 1.0,
+      "p95": 4.0,
+      "p99": 4.0
+    },
+    "hourSin": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 1.2246467991473532e-16,
+      "p01": -1.0,
+      "p05": -0.9659258262890684,
+      "p95": 0.9659258262890683,
+      "p99": 1.0
+    },
+    "hourCos": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 6.123233995736766e-17,
+      "p01": -1.0,
+      "p05": -0.9659258262890683,
+      "p95": 0.9659258262890683,
+      "p99": 1.0
+    },
+    "dayOfWeekSin": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": 0.0,
+      "p01": -0.9749279121818236,
+      "p05": -0.9749279121818236,
+      "p95": 0.9749279121818236,
+      "p99": 0.9749279121818236
+    },
+    "dayOfWeekCos": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": -0.22252093395631434,
+      "p01": -0.9009688679024191,
+      "p05": -0.9009688679024191,
+      "p95": 1.0,
+      "p99": 1.0
+    },
+    "monthSin": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": -2.4492935982947064e-16,
+      "p01": -1.0,
+      "p05": -1.0,
+      "p95": 1.0,
+      "p99": 1.0
+    },
+    "monthCos": {
+      "nonNullCount": 59888,
+      "nullCount": 0,
+      "median": -1.8369701987210297e-16,
+      "p01": -1.0,
+      "p05": -1.0,
+      "p95": 1.0,
+      "p99": 1.0
+    },
+    "stationLatitudeFeature": {
+      "nonNullCount": 49774,
+      "nullCount": 10114,
+      "median": 26.863,
+      "p01": 19.057,
+      "p05": 19.057,
+      "p95": 28.629,
+      "p99": 28.629
+    },
+    "stationLongitudeFeature": {
+      "nonNullCount": 49774,
+      "nullCount": 10114,
+      "median": 77.241,
+      "p01": 72.859,
+      "p05": 72.859,
+      "p95": 80.999,
+      "p99": 80.999
+    }
+  },
+  "imputerDefaults": {
+    "co": null,
+    "coUnitHandling": null,
+    "currentAqi": 117.0,
+    "latitude": 26.863,
+    "longitude": 77.241,
+    "nh3": null,
+    "no2": null,
+    "o3": null,
+    "pm10": null,
+    "pm25": null,
+    "so2": null,
+    "stationId": null,
+    "stationLatitude": 26.863,
+    "stationLongitude": 77.241,
+    "subIndexes": null,
+    "stationDistanceKm": null,
+    "temperatureCelsius": null,
+    "humidityPercent": null,
+    "pressureHpa": null,
+    "windSpeedMps": null,
+    "windDirectionDegrees": null,
+    "rainfallMm": null,
+    "openWeatherAqiIndex": null,
+    "weather_temperatureCelsius": null,
+    "weather_humidityPercent": null,
+    "weather_pressureHpa": null,
+    "weather_windSpeedMps": null,
+    "weather_windDirectionDegrees": null,
+    "weather_rainfallMm": null,
+    "weather_cloudCoverPercent": null,
+    "pm25_pm10_ratio": null,
+    "hour": 11.0,
+    "dayOfWeek": 3.0,
+    "month": 7.0,
+    "isWeekend": 0.0,
+    "season": 3.0,
+    "hourSin": 1.2246467991473532e-16,
+    "hourCos": 6.123233995736766e-17,
+    "dayOfWeekSin": 0.0,
+    "dayOfWeekCos": -0.22252093395631434,
+    "monthSin": -2.4492935982947064e-16,
+    "monthCos": -1.8369701987210297e-16,
+    "stationLatitudeFeature": 26.863,
+    "stationLongitudeFeature": 77.241
+  },
+  "trainingDeltaPercentiles": {
+    "p01": -135.0,
+    "p05": -72.0,
+    "p50": 1.0,
+    "p95": 69.0,
+    "p99": 120.0
+  },
+  "ridgeDiagnostics": null,
+  "trainingRowCount": 59888,
+  "trainingDateRange": [
+    "2022-12-31T18:00:00+00:00",
+    "2025-12-30T17:00:00+00:00"
+  ],
+  "testRowCount": 26900,
+  "datasetChecksum": "ffcc387530b78b702ddf036d1dac1acec141e4a31335a48a482e5bc4b8e07234",
+  "metrics": {
+    "sample_count": 26900,
+    "mae": 30.08481703551701,
+    "rmse": 42.05215038809826,
+    "mean_bias": 1.8257159664213907,
+    "median_absolute_error": 21.337873578071594,
+    "category_accuracy": 0.6422304832713754,
+    "interval_coverage": null
+  },
+  "bestBaseline": "persistence",
+  "baselineMetrics": {
+    "sample_count": 26900,
+    "mae": 31.23710037174721,
+    "rmse": 44.98538135123437,
+    "mean_bias": -0.4508550185873606,
+    "median_absolute_error": 21.0,
+    "category_accuracy": 0.6544609665427509,
+    "interval_coverage": null
+  },
+  "allBaselines": {
+    "persistence": {
+      "sample_count": 26900,
+      "mae": 31.23710037174721,
+      "rmse": 44.98538135123437,
+      "mean_bias": -0.4508550185873606,
+      "median_absolute_error": 21.0,
+      "category_accuracy": 0.6544609665427509,
+      "interval_coverage": null
+    },
+    "seasonal": {
+      "sample_count": 26900,
+      "mae": 41.131152416356876,
+      "rmse": 56.99159528461633,
+      "mean_bias": -0.8915241635687733,
+      "median_absolute_error": 29.0,
+      "category_accuracy": 0.5463197026022305,
+      "interval_coverage": null
+    },
+    "week": {
+      "sample_count": 26900,
+      "mae": 54.97933085501859,
+      "rmse": 75.46581638317565,
+      "mean_bias": -3.266171003717472,
+      "median_absolute_error": 40.0,
+      "category_accuracy": 0.4662081784386617,
+      "interval_coverage": null
+    },
+    "trend": {
+      "sample_count": 26900,
+      "mae": 46.19684014869888,
+      "rmse": 65.08372103294667,
+      "mean_bias": 0.4262081784386617,
+      "median_absolute_error": 32.0,
+      "category_accuracy": 0.5362453531598513,
+      "interval_coverage": null
+    }
+  },
+  "modelComparison": {
+    "HGB": {
+      "family": "SKLEARN_HIST_GRADIENT_BOOSTING",
+      "avg_val_rmse": 43.84776188943119
+    },
+    "RIDGE": {
+      "family": "SKLEARN_RIDGE",
+      "avg_val_rmse": 41.617928516911945
+    },
+    "HUBER": {
+      "family": "SKLEARN_HUBER",
+      "avg_val_rmse": 41.71088958771395
+    },
+    "XGB": {
+      "family": "XGBOOST",
+      "avg_val_rmse": 40.7251832481243
+    }
+  },
+  "sparseValidation": {
+    "one_observation": {
+      "model": {
+        "sample_count": 26900,
+        "mae": 30.08481703551701,
+        "rmse": 42.05215038809826,
+        "mean_bias": 1.8257159664213907,
+        "median_absolute_error": 21.337873578071594,
+        "category_accuracy": 0.6422304832713754,
+        "interval_coverage": null,
+        "p90_absolute_error": 68.94711610525852,
+        "pct_change_gt_100": 0.09293680297397769
+      },
+      "persistence": {
+        "sample_count": 26900,
+        "mae": 31.23710037174721,
+        "rmse": 44.98538135123437,
+        "mean_bias": -0.4508550185873606,
+        "median_absolute_error": 21.0,
+        "category_accuracy": 0.6544609665427509,
+        "interval_coverage": null,
+        "p90_absolute_error": 74.0,
+        "pct_change_gt_100": 0.0
+      },
+      "perStation": {
+        "bandra_kurla_complex_mumbai_iitm": {
+          "model": {
+            "sample_count": 1073,
+            "mae": 36.747028300939654,
+            "rmse": 48.962129697341446,
+            "mean_bias": 7.211320781759147,
+            "median_absolute_error": 27.942158460617065,
+            "category_accuracy": 0.5368126747437092,
+            "interval_coverage": null,
+            "p90_absolute_error": 71.89062118530276,
+            "pct_change_gt_100": 0.0
+          },
+          "persistence": {
+            "sample_count": 1073,
+            "mae": 34.74370922646785,
+            "rmse": 49.459482885932964,
+            "mean_bias": -1.6216216216216217,
+            "median_absolute_error": 25.0,
+            "category_accuracy": 0.6216216216216216,
+            "interval_coverage": null,
+            "p90_absolute_error": 71.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "bandra_kurla_complex_mumbai_mpcb": {
+          "model": {
+            "sample_count": 3473,
+            "mae": 27.102680478712156,
+            "rmse": 38.97519649843867,
+            "mean_bias": 8.489967638881984,
+            "median_absolute_error": 18.620609283447266,
+            "category_accuracy": 0.6798157212784336,
+            "interval_coverage": null,
+            "p90_absolute_error": 62.99788436889649,
+            "pct_change_gt_100": 0.0
+          },
+          "persistence": {
+            "sample_count": 3473,
+            "mae": 25.591419522027067,
+            "rmse": 36.92789138453058,
+            "mean_bias": 0.04750935790382954,
+            "median_absolute_error": 17.0,
+            "category_accuracy": 0.6757846242441693,
+            "interval_coverage": null,
+            "p90_absolute_error": 63.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "gomti_nagar_lucknow_uppcb": {
+          "model": {
+            "sample_count": 11452,
+            "mae": 28.826185468547134,
+            "rmse": 39.709771420372235,
+            "mean_bias": -1.4201970939285216,
+            "median_absolute_error": 20.420651078224182,
+            "category_accuracy": 0.6204156479217604,
+            "interval_coverage": null,
+            "p90_absolute_error": 65.37960262298584,
+            "pct_change_gt_100": 0.17464198393293748
+          },
+          "persistence": {
+            "sample_count": 11452,
+            "mae": 31.114303178484107,
+            "rmse": 44.182826551362254,
+            "mean_bias": -0.16285365001746419,
+            "median_absolute_error": 22.0,
+            "category_accuracy": 0.6279252532308767,
+            "interval_coverage": null,
+            "p90_absolute_error": 74.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "ito_delhi_cpcb": {
+          "model": {
+            "sample_count": 10902,
+            "mae": 31.70124120346085,
+            "rmse": 44.57676693704287,
+            "mean_bias": 2.582319923659892,
+            "median_absolute_error": 22.819229125976562,
+            "category_accuracy": 0.6635479728490186,
+            "interval_coverage": null,
+            "p90_absolute_error": 74.18864665031433,
+            "pct_change_gt_100": 0.0458631443771785
+          },
+          "persistence": {
+            "sample_count": 10902,
+            "mae": 32.81948266373143,
+            "rmse": 47.61855022409725,
+            "mean_bias": -0.7969179966978536,
+            "median_absolute_error": 21.5,
+            "category_accuracy": 0.6787745367822418,
+            "interval_coverage": null,
+            "p90_absolute_error": 77.0,
+            "pct_change_gt_100": 0.0
+          }
+        }
+      }
+    },
+    "four_observations": {
+      "model": {
+        "sample_count": 26900,
+        "mae": 30.08481703551701,
+        "rmse": 42.05215038809826,
+        "mean_bias": 1.8257159664213907,
+        "median_absolute_error": 21.337873578071594,
+        "category_accuracy": 0.6422304832713754,
+        "interval_coverage": null,
+        "p90_absolute_error": 68.94711610525852,
+        "pct_change_gt_100": 0.09293680297397769
+      },
+      "persistence": {
+        "sample_count": 26900,
+        "mae": 31.23710037174721,
+        "rmse": 44.98538135123437,
+        "mean_bias": -0.4508550185873606,
+        "median_absolute_error": 21.0,
+        "category_accuracy": 0.6544609665427509,
+        "interval_coverage": null,
+        "p90_absolute_error": 74.0,
+        "pct_change_gt_100": 0.0
+      },
+      "perStation": {
+        "bandra_kurla_complex_mumbai_iitm": {
+          "model": {
+            "sample_count": 1073,
+            "mae": 36.747028300939654,
+            "rmse": 48.962129697341446,
+            "mean_bias": 7.211320781759147,
+            "median_absolute_error": 27.942158460617065,
+            "category_accuracy": 0.5368126747437092,
+            "interval_coverage": null,
+            "p90_absolute_error": 71.89062118530276,
+            "pct_change_gt_100": 0.0
+          },
+          "persistence": {
+            "sample_count": 1073,
+            "mae": 34.74370922646785,
+            "rmse": 49.459482885932964,
+            "mean_bias": -1.6216216216216217,
+            "median_absolute_error": 25.0,
+            "category_accuracy": 0.6216216216216216,
+            "interval_coverage": null,
+            "p90_absolute_error": 71.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "bandra_kurla_complex_mumbai_mpcb": {
+          "model": {
+            "sample_count": 3473,
+            "mae": 27.102680478712156,
+            "rmse": 38.97519649843867,
+            "mean_bias": 8.489967638881984,
+            "median_absolute_error": 18.620609283447266,
+            "category_accuracy": 0.6798157212784336,
+            "interval_coverage": null,
+            "p90_absolute_error": 62.99788436889649,
+            "pct_change_gt_100": 0.0
+          },
+          "persistence": {
+            "sample_count": 3473,
+            "mae": 25.591419522027067,
+            "rmse": 36.92789138453058,
+            "mean_bias": 0.04750935790382954,
+            "median_absolute_error": 17.0,
+            "category_accuracy": 0.6757846242441693,
+            "interval_coverage": null,
+            "p90_absolute_error": 63.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "gomti_nagar_lucknow_uppcb": {
+          "model": {
+            "sample_count": 11452,
+            "mae": 28.826185468547134,
+            "rmse": 39.709771420372235,
+            "mean_bias": -1.4201970939285216,
+            "median_absolute_error": 20.420651078224182,
+            "category_accuracy": 0.6204156479217604,
+            "interval_coverage": null,
+            "p90_absolute_error": 65.37960262298584,
+            "pct_change_gt_100": 0.17464198393293748
+          },
+          "persistence": {
+            "sample_count": 11452,
+            "mae": 31.114303178484107,
+            "rmse": 44.182826551362254,
+            "mean_bias": -0.16285365001746419,
+            "median_absolute_error": 22.0,
+            "category_accuracy": 0.6279252532308767,
+            "interval_coverage": null,
+            "p90_absolute_error": 74.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "ito_delhi_cpcb": {
+          "model": {
+            "sample_count": 10902,
+            "mae": 31.70124120346085,
+            "rmse": 44.57676693704287,
+            "mean_bias": 2.582319923659892,
+            "median_absolute_error": 22.819229125976562,
+            "category_accuracy": 0.6635479728490186,
+            "interval_coverage": null,
+            "p90_absolute_error": 74.18864665031433,
+            "pct_change_gt_100": 0.0458631443771785
+          },
+          "persistence": {
+            "sample_count": 10902,
+            "mae": 32.81948266373143,
+            "rmse": 47.61855022409725,
+            "mean_bias": -0.7969179966978536,
+            "median_absolute_error": 21.5,
+            "category_accuracy": 0.6787745367822418,
+            "interval_coverage": null,
+            "p90_absolute_error": 77.0,
+            "pct_change_gt_100": 0.0
+          }
+        }
+      }
+    },
+    "partial_pollutants": {
+      "model": {
+        "sample_count": 26900,
+        "mae": 30.08481703551701,
+        "rmse": 42.05215038809826,
+        "mean_bias": 1.8257159664213907,
+        "median_absolute_error": 21.337873578071594,
+        "category_accuracy": 0.6422304832713754,
+        "interval_coverage": null,
+        "p90_absolute_error": 68.94711610525852,
+        "pct_change_gt_100": 0.09293680297397769
+      },
+      "persistence": {
+        "sample_count": 26900,
+        "mae": 31.23710037174721,
+        "rmse": 44.98538135123437,
+        "mean_bias": -0.4508550185873606,
+        "median_absolute_error": 21.0,
+        "category_accuracy": 0.6544609665427509,
+        "interval_coverage": null,
+        "p90_absolute_error": 74.0,
+        "pct_change_gt_100": 0.0
+      },
+      "perStation": {
+        "bandra_kurla_complex_mumbai_iitm": {
+          "model": {
+            "sample_count": 1073,
+            "mae": 36.747028300939654,
+            "rmse": 48.962129697341446,
+            "mean_bias": 7.211320781759147,
+            "median_absolute_error": 27.942158460617065,
+            "category_accuracy": 0.5368126747437092,
+            "interval_coverage": null,
+            "p90_absolute_error": 71.89062118530276,
+            "pct_change_gt_100": 0.0
+          },
+          "persistence": {
+            "sample_count": 1073,
+            "mae": 34.74370922646785,
+            "rmse": 49.459482885932964,
+            "mean_bias": -1.6216216216216217,
+            "median_absolute_error": 25.0,
+            "category_accuracy": 0.6216216216216216,
+            "interval_coverage": null,
+            "p90_absolute_error": 71.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "bandra_kurla_complex_mumbai_mpcb": {
+          "model": {
+            "sample_count": 3473,
+            "mae": 27.102680478712156,
+            "rmse": 38.97519649843867,
+            "mean_bias": 8.489967638881984,
+            "median_absolute_error": 18.620609283447266,
+            "category_accuracy": 0.6798157212784336,
+            "interval_coverage": null,
+            "p90_absolute_error": 62.99788436889649,
+            "pct_change_gt_100": 0.0
+          },
+          "persistence": {
+            "sample_count": 3473,
+            "mae": 25.591419522027067,
+            "rmse": 36.92789138453058,
+            "mean_bias": 0.04750935790382954,
+            "median_absolute_error": 17.0,
+            "category_accuracy": 0.6757846242441693,
+            "interval_coverage": null,
+            "p90_absolute_error": 63.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "gomti_nagar_lucknow_uppcb": {
+          "model": {
+            "sample_count": 11452,
+            "mae": 28.826185468547134,
+            "rmse": 39.709771420372235,
+            "mean_bias": -1.4201970939285216,
+            "median_absolute_error": 20.420651078224182,
+            "category_accuracy": 0.6204156479217604,
+            "interval_coverage": null,
+            "p90_absolute_error": 65.37960262298584,
+            "pct_change_gt_100": 0.17464198393293748
+          },
+          "persistence": {
+            "sample_count": 11452,
+            "mae": 31.114303178484107,
+            "rmse": 44.182826551362254,
+            "mean_bias": -0.16285365001746419,
+            "median_absolute_error": 22.0,
+            "category_accuracy": 0.6279252532308767,
+            "interval_coverage": null,
+            "p90_absolute_error": 74.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "ito_delhi_cpcb": {
+          "model": {
+            "sample_count": 10902,
+            "mae": 31.70124120346085,
+            "rmse": 44.57676693704287,
+            "mean_bias": 2.582319923659892,
+            "median_absolute_error": 22.819229125976562,
+            "category_accuracy": 0.6635479728490186,
+            "interval_coverage": null,
+            "p90_absolute_error": 74.18864665031433,
+            "pct_change_gt_100": 0.0458631443771785
+          },
+          "persistence": {
+            "sample_count": 10902,
+            "mae": 32.81948266373143,
+            "rmse": 47.61855022409725,
+            "mean_bias": -0.7969179966978536,
+            "median_absolute_error": 21.5,
+            "category_accuracy": 0.6787745367822418,
+            "interval_coverage": null,
+            "p90_absolute_error": 77.0,
+            "pct_change_gt_100": 0.0
+          }
+        }
+      }
+    },
+    "missing_weather": {
+      "model": {
+        "sample_count": 26900,
+        "mae": 30.08481703551701,
+        "rmse": 42.05215038809826,
+        "mean_bias": 1.8257159664213907,
+        "median_absolute_error": 21.337873578071594,
+        "category_accuracy": 0.6422304832713754,
+        "interval_coverage": null,
+        "p90_absolute_error": 68.94711610525852,
+        "pct_change_gt_100": 0.09293680297397769
+      },
+      "persistence": {
+        "sample_count": 26900,
+        "mae": 31.23710037174721,
+        "rmse": 44.98538135123437,
+        "mean_bias": -0.4508550185873606,
+        "median_absolute_error": 21.0,
+        "category_accuracy": 0.6544609665427509,
+        "interval_coverage": null,
+        "p90_absolute_error": 74.0,
+        "pct_change_gt_100": 0.0
+      },
+      "perStation": {
+        "bandra_kurla_complex_mumbai_iitm": {
+          "model": {
+            "sample_count": 1073,
+            "mae": 36.747028300939654,
+            "rmse": 48.962129697341446,
+            "mean_bias": 7.211320781759147,
+            "median_absolute_error": 27.942158460617065,
+            "category_accuracy": 0.5368126747437092,
+            "interval_coverage": null,
+            "p90_absolute_error": 71.89062118530276,
+            "pct_change_gt_100": 0.0
+          },
+          "persistence": {
+            "sample_count": 1073,
+            "mae": 34.74370922646785,
+            "rmse": 49.459482885932964,
+            "mean_bias": -1.6216216216216217,
+            "median_absolute_error": 25.0,
+            "category_accuracy": 0.6216216216216216,
+            "interval_coverage": null,
+            "p90_absolute_error": 71.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "bandra_kurla_complex_mumbai_mpcb": {
+          "model": {
+            "sample_count": 3473,
+            "mae": 27.102680478712156,
+            "rmse": 38.97519649843867,
+            "mean_bias": 8.489967638881984,
+            "median_absolute_error": 18.620609283447266,
+            "category_accuracy": 0.6798157212784336,
+            "interval_coverage": null,
+            "p90_absolute_error": 62.99788436889649,
+            "pct_change_gt_100": 0.0
+          },
+          "persistence": {
+            "sample_count": 3473,
+            "mae": 25.591419522027067,
+            "rmse": 36.92789138453058,
+            "mean_bias": 0.04750935790382954,
+            "median_absolute_error": 17.0,
+            "category_accuracy": 0.6757846242441693,
+            "interval_coverage": null,
+            "p90_absolute_error": 63.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "gomti_nagar_lucknow_uppcb": {
+          "model": {
+            "sample_count": 11452,
+            "mae": 28.826185468547134,
+            "rmse": 39.709771420372235,
+            "mean_bias": -1.4201970939285216,
+            "median_absolute_error": 20.420651078224182,
+            "category_accuracy": 0.6204156479217604,
+            "interval_coverage": null,
+            "p90_absolute_error": 65.37960262298584,
+            "pct_change_gt_100": 0.17464198393293748
+          },
+          "persistence": {
+            "sample_count": 11452,
+            "mae": 31.114303178484107,
+            "rmse": 44.182826551362254,
+            "mean_bias": -0.16285365001746419,
+            "median_absolute_error": 22.0,
+            "category_accuracy": 0.6279252532308767,
+            "interval_coverage": null,
+            "p90_absolute_error": 74.0,
+            "pct_change_gt_100": 0.0
+          }
+        },
+        "ito_delhi_cpcb": {
+          "model": {
+            "sample_count": 10902,
+            "mae": 31.70124120346085,
+            "rmse": 44.57676693704287,
+            "mean_bias": 2.582319923659892,
+            "median_absolute_error": 22.819229125976562,
+            "category_accuracy": 0.6635479728490186,
+            "interval_coverage": null,
+            "p90_absolute_error": 74.18864665031433,
+            "pct_change_gt_100": 0.0458631443771785
+          },
+          "persistence": {
+            "sample_count": 10902,
+            "mae": 32.81948266373143,
+            "rmse": 47.61855022409725,
+            "mean_bias": -0.7969179966978536,
+            "median_absolute_error": 21.5,
+            "category_accuracy": 0.6787745367822418,
+            "interval_coverage": null,
+            "p90_absolute_error": 77.0,
+            "pct_change_gt_100": 0.0
+          }
+        }
+      }
+    }
+  },
+  "sparsePromotionStatus": "PROMOTED",
+  "walkForwardStable": true,
+  "heldOutStationEvaluation": {
+    "bandra_kurla_complex_mumbai_iitm": {
+      "sample_count": 1073,
+      "mae": 36.747028300939654,
+      "rmse": 48.962129697341446,
+      "mean_bias": 7.211320781759147,
+      "median_absolute_error": 27.942158460617065,
+      "category_accuracy": 0.5368126747437092,
+      "interval_coverage": null
+    },
+    "bandra_kurla_complex_mumbai_mpcb": {
+      "sample_count": 3473,
+      "mae": 27.102680478712156,
+      "rmse": 38.97519649843867,
+      "mean_bias": 8.489967638881984,
+      "median_absolute_error": 18.620609283447266,
+      "category_accuracy": 0.6798157212784336,
+      "interval_coverage": null
+    },
+    "gomti_nagar_lucknow_uppcb": {
+      "sample_count": 11452,
+      "mae": 28.826185468547134,
+      "rmse": 39.709771420372235,
+      "mean_bias": -1.4201970939285216,
+      "median_absolute_error": 20.420651078224182,
+      "category_accuracy": 0.6204156479217604,
+      "interval_coverage": null
+    },
+    "ito_delhi_cpcb": {
+      "sample_count": 10902,
+      "mae": 31.70124120346085,
+      "rmse": 44.57676693704287,
+      "mean_bias": 2.582319923659892,
+      "median_absolute_error": 22.819229125976562,
+      "category_accuracy": 0.6635479728490186,
+      "interval_coverage": null
+    }
+  },
+  "heldOutCityEvaluation": {
+    "Delhi": {
+      "sample_count": 10902,
+      "mae": 31.70124120346085,
+      "rmse": 44.57676693704287,
+      "mean_bias": 2.582319923659892,
+      "median_absolute_error": 22.819229125976562,
+      "category_accuracy": 0.6635479728490186,
+      "interval_coverage": null
+    },
+    "Lucknow": {
+      "sample_count": 11452,
+      "mae": 28.826185468547134,
+      "rmse": 39.709771420372235,
+      "mean_bias": -1.4201970939285216,
+      "median_absolute_error": 20.420651078224182,
+      "category_accuracy": 0.6204156479217604,
+      "interval_coverage": null
+    },
+    "Mumbai": {
+      "sample_count": 4546,
+      "mae": 29.3790520610373,
+      "rmse": 41.54942445647741,
+      "mean_bias": 8.188166477928881,
+      "median_absolute_error": 21.152941465377808,
+      "category_accuracy": 0.6460624725032996,
+      "interval_coverage": null
+    }
+  },
+  "stationGroupedEvaluation": {
+    "bandra_kurla_complex_mumbai_iitm": {
+      "city": "Mumbai",
+      "trainRows": 57476,
+      "testRows": 2412,
+      "metrics": {
+        "sample_count": 2412,
+        "mae": 24.414696052568544,
+        "rmse": 34.925235638828845,
+        "mean_bias": 5.449926941348225,
+        "median_absolute_error": 16.10254991054535,
+        "category_accuracy": 0.6434494195688225,
+        "interval_coverage": null,
+        "p90_absolute_error": 53.68811299800876,
+        "pct_change_gt_100": 0.0
+      },
+      "persistenceBaseline": {
+        "sample_count": 2412,
+        "mae": 23.572139303482587,
+        "rmse": 35.978861031551496,
+        "mean_bias": -0.6268656716417911,
+        "median_absolute_error": 15.0,
+        "category_accuracy": 0.6368159203980099,
+        "interval_coverage": null,
+        "p90_absolute_error": 54.0,
+        "pct_change_gt_100": 0.0
+      },
+      "oodRate": 0.00041459369817578774
+    },
+    "bandra_kurla_complex_mumbai_mpcb": {
+      "city": "Mumbai",
+      "trainRows": 52143,
+      "testRows": 7745,
+      "metrics": {
+        "sample_count": 7745,
+        "mae": 31.37138259797769,
+        "rmse": 44.659162875041325,
+        "mean_bias": -13.787000901863374,
+        "median_absolute_error": 21.731395721435547,
+        "category_accuracy": 0.6278889606197546,
+        "interval_coverage": null,
+        "p90_absolute_error": 73.90194387435916,
+        "pct_change_gt_100": 3.4990316333118137
+      },
+      "persistenceBaseline": {
+        "sample_count": 7745,
+        "mae": 21.669851517107812,
+        "rmse": 34.84551352444731,
+        "mean_bias": 0.45590703679793415,
+        "median_absolute_error": 11.0,
+        "category_accuracy": 0.6774693350548742,
+        "interval_coverage": null,
+        "p90_absolute_error": 56.600000000000364,
+        "pct_change_gt_100": 0.0
+      },
+      "oodRate": 1.0
+    },
+    "gomti_nagar_lucknow_uppcb": {
+      "city": "Lucknow",
+      "trainRows": 34412,
+      "testRows": 25476,
+      "metrics": {
+        "sample_count": 25476,
+        "mae": 30.786335785883068,
+        "rmse": 41.188527377752834,
+        "mean_bias": 14.127305525083461,
+        "median_absolute_error": 22.443817138671875,
+        "category_accuracy": 0.5561312607944733,
+        "interval_coverage": null,
+        "p90_absolute_error": 69.30387496948242,
+        "pct_change_gt_100": 0.027476840948343538
+      },
+      "persistenceBaseline": {
+        "sample_count": 25476,
+        "mae": 27.08474642801068,
+        "rmse": 39.476866967791594,
+        "mean_bias": 0.042196577170670435,
+        "median_absolute_error": 18.0,
+        "category_accuracy": 0.6399748783168472,
+        "interval_coverage": null,
+        "p90_absolute_error": 65.0,
+        "pct_change_gt_100": 0.0
+      },
+      "oodRate": 1.0
+    },
+    "ito_delhi_cpcb": {
+      "city": "Delhi",
+      "trainRows": 35633,
+      "testRows": 24255,
+      "metrics": {
+        "sample_count": 24255,
+        "mae": 48.02399041232403,
+        "rmse": 67.28621793280392,
+        "mean_bias": -33.06702655479193,
+        "median_absolute_error": 31.54986000061035,
+        "category_accuracy": 0.5670583384869099,
+        "interval_coverage": null,
+        "p90_absolute_error": 118.09743041992189,
+        "pct_change_gt_100": 11.453308596165739
+      },
+      "persistenceBaseline": {
+        "sample_count": 24255,
+        "mae": 34.74722737579881,
+        "rmse": 50.60375288677235,
+        "mean_bias": -0.17868480725623584,
+        "median_absolute_error": 23.0,
+        "category_accuracy": 0.6661306947021233,
+        "interval_coverage": null,
+        "p90_absolute_error": 79.0,
+        "pct_change_gt_100": 0.0
+      },
+      "oodRate": 1.0
+    }
+  },
+  "heldOutValidationFailures": [
+    {
+      "station": "bandra_kurla_complex_mumbai_iitm",
+      "city": "Mumbai",
+      "testRows": 2412,
+      "reasons": [
+        "MAE_BASELINE_BETTER"
+      ],
+      "modelMae": 24.414696052568544,
+      "persistenceMae": 23.572139303482587,
+      "modelRmse": 34.925235638828845,
+      "persistenceRmse": 35.978861031551496,
+      "bias": 5.449926941348225
+    },
+    {
+      "station": "bandra_kurla_complex_mumbai_mpcb",
+      "city": "Mumbai",
+      "testRows": 7745,
+      "reasons": [
+        "MAE_BASELINE_BETTER",
+        "RMSE_BASELINE_BETTER"
+      ],
+      "modelMae": 31.37138259797769,
+      "persistenceMae": 21.669851517107812,
+      "modelRmse": 44.659162875041325,
+      "persistenceRmse": 34.84551352444731,
+      "bias": -13.787000901863374
+    },
+    {
+      "station": "gomti_nagar_lucknow_uppcb",
+      "city": "Lucknow",
+      "testRows": 25476,
+      "reasons": [
+        "MAE_BASELINE_BETTER",
+        "RMSE_BASELINE_BETTER"
+      ],
+      "modelMae": 30.786335785883068,
+      "persistenceMae": 27.08474642801068,
+      "modelRmse": 41.188527377752834,
+      "persistenceRmse": 39.476866967791594,
+      "bias": 14.127305525083461
+    },
+    {
+      "station": "ito_delhi_cpcb",
+      "city": "Delhi",
+      "testRows": 24255,
+      "reasons": [
+        "MAE_BASELINE_BETTER",
+        "RMSE_BASELINE_BETTER",
+        "BIAS_TOO_HIGH"
+      ],
+      "modelMae": 48.02399041232403,
+      "persistenceMae": 34.74722737579881,
+      "modelRmse": 67.28621793280392,
+      "persistenceRmse": 50.60375288677235,
+      "bias": -33.06702655479193
+    }
+  ],
+  "heldOutValidationStatus": "FAILED_HELDOUT_BASELINE",
+  "trainingRowsPerStation": {
+    "bandra_kurla_complex_mumbai_iitm": 2436,
+    "bandra_kurla_complex_mumbai_mpcb": 7769,
+    "gomti_nagar_lucknow_uppcb": 25500,
+    "ito_delhi_cpcb": 24279,
+    "kurla_mumbai_mpcb": 2,
+    "lalbagh_lucknow_cpcb": 2,
+    "talkatora_garden_delhi_dpcc": 6
+  },
+  "trainingStationCount": 4,
+  "trainingCities": [
+    "Delhi",
+    "Lucknow",
+    "Mumbai"
+  ],
+  "heldOutStationCount": 4,
+  "coverageScope": "LIMITED_STATION_COVERAGE",
+  "generalizationStatus": "LIMITED_STATION_COVERAGE",
+  "coverageLabel": "LIMITED_STATION_COVERAGE",
+  "oodPolicy": {
+    "lowMaxScore": 0.05,
+    "mediumMaxScore": 0.15,
+    "mediumRequiresHeldOutRobust": true,
+    "highFallbackReason": "OUT_OF_DISTRIBUTION_FEATURES"
+  },
+  "promotionStatus": "REJECTED_HELDOUT_BASELINE_BETTER",
+  "promotedAt": null,
+  "residualQuantiles": {
+    "p10": -50.75783166885376,
+    "p90": 48.03639373779299
+  },
+  "currentPromotedComparison": {
+    "status": "NO_CURRENT_PROMOTED_MODEL",
+    "newModelBetter": true
+  }
+}

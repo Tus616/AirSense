@@ -1,0 +1,1982 @@
+{
+  "modelId": "aqi-48h-xgb-GLOBAL_SHORT_HISTORY-20260718210000",
+  "horizonHours": 48,
+  "modelScope": "GLOBAL_SHORT_HISTORY",
+  "modelScopeType": "MULTI_STATION_GLOBAL_ML",
+  "forecastScope": "GLOBAL",
+  "stationKey": null,
+  "historyTier": "GLOBAL_SHORT_HISTORY",
+  "requiredHistoryHours": 1,
+  "aqiStandard": "INDIA_NAQI",
+  "modelFamily": "XGBOOST",
+  "version": "aqi-48h-xgb-GLOBAL_SHORT_HISTORY-20260718210000",
+  "artifactPath": "models\\aqi-48h-xgb-GLOBAL_SHORT_HISTORY-20260718210000.joblib",
+  "featureSchemaVersion": "forecasting-feature-schema-v2",
+  "useDeltaTarget": true,
+  "features": [
+    "co",
+    "coUnitHandling",
+    "currentAqi",
+    "latitude",
+    "longitude",
+    "nh3",
+    "no2",
+    "o3",
+    "pm10",
+    "pm25",
+    "so2",
+    "stationId",
+    "stationLatitude",
+    "stationLongitude",
+    "subIndexes",
+    "stationDistanceKm",
+    "temperatureCelsius",
+    "humidityPercent",
+    "pressureHpa",
+    "windSpeedMps",
+    "windDirectionDegrees",
+    "rainfallMm",
+    "openWeatherAqiIndex",
+    "weather_temperatureCelsius",
+    "weather_humidityPercent",
+    "weather_pressureHpa",
+    "weather_windSpeedMps",
+    "weather_windDirectionDegrees",
+    "weather_rainfallMm",
+    "weather_cloudCoverPercent",
+    "currentAqi_lag_1h",
+    "currentAqi_lag_3h",
+    "currentAqi_lag_6h",
+    "currentAqi_lag_12h",
+    "currentAqi_lag_24h",
+    "currentAqi_change_1h",
+    "currentAqi_change_3h",
+    "currentAqi_change_6h",
+    "currentAqi_change_24h",
+    "pm25_lag_1h",
+    "pm25_lag_3h",
+    "pm25_lag_6h",
+    "pm25_lag_12h",
+    "pm25_lag_24h",
+    "pm25_change_1h",
+    "pm25_change_3h",
+    "pm25_change_6h",
+    "pm25_change_24h",
+    "pm10_lag_1h",
+    "pm10_lag_3h",
+    "pm10_lag_6h",
+    "pm10_lag_12h",
+    "pm10_lag_24h",
+    "pm10_change_1h",
+    "pm10_change_3h",
+    "pm10_change_6h",
+    "pm10_change_24h",
+    "no2_lag_1h",
+    "no2_lag_3h",
+    "no2_lag_6h",
+    "no2_lag_12h",
+    "no2_lag_24h",
+    "no2_change_1h",
+    "no2_change_3h",
+    "no2_change_6h",
+    "no2_change_24h",
+    "so2_lag_1h",
+    "so2_lag_3h",
+    "so2_lag_6h",
+    "so2_lag_12h",
+    "so2_lag_24h",
+    "so2_change_1h",
+    "so2_change_3h",
+    "so2_change_6h",
+    "so2_change_24h",
+    "co_lag_1h",
+    "co_lag_3h",
+    "co_lag_6h",
+    "co_lag_12h",
+    "co_lag_24h",
+    "co_change_1h",
+    "co_change_3h",
+    "co_change_6h",
+    "co_change_24h",
+    "o3_lag_1h",
+    "o3_lag_3h",
+    "o3_lag_6h",
+    "o3_lag_12h",
+    "o3_lag_24h",
+    "o3_change_1h",
+    "o3_change_3h",
+    "o3_change_6h",
+    "o3_change_24h",
+    "nh3_lag_1h",
+    "nh3_lag_3h",
+    "nh3_lag_6h",
+    "nh3_lag_12h",
+    "nh3_lag_24h",
+    "nh3_change_1h",
+    "nh3_change_3h",
+    "nh3_change_6h",
+    "nh3_change_24h",
+    "pm25_pm10_ratio",
+    "aqi_roll_3h_mean",
+    "aqi_roll_3h_median",
+    "aqi_roll_3h_min",
+    "aqi_roll_3h_max",
+    "aqi_roll_3h_std",
+    "aqi_roll_3h_slope",
+    "aqi_roll_6h_mean",
+    "aqi_roll_6h_median",
+    "aqi_roll_6h_min",
+    "aqi_roll_6h_max",
+    "aqi_roll_6h_std",
+    "aqi_roll_6h_slope",
+    "aqi_roll_12h_mean",
+    "aqi_roll_12h_median",
+    "aqi_roll_12h_min",
+    "aqi_roll_12h_max",
+    "aqi_roll_12h_std",
+    "aqi_roll_12h_slope",
+    "aqi_roll_24h_mean",
+    "aqi_roll_24h_median",
+    "aqi_roll_24h_min",
+    "aqi_roll_24h_max",
+    "aqi_roll_24h_std",
+    "aqi_roll_24h_slope",
+    "aqi_prev_day_same_hour",
+    "aqi_missing_3h_ratio",
+    "aqi_missing_6h_ratio",
+    "aqi_missing_12h_ratio",
+    "aqi_missing_24h_ratio",
+    "hour",
+    "dayOfWeek",
+    "month",
+    "isWeekend",
+    "season",
+    "hourSin",
+    "hourCos",
+    "dayOfWeekSin",
+    "dayOfWeekCos",
+    "monthSin",
+    "monthCos",
+    "stationLatitudeFeature",
+    "stationLongitudeFeature"
+  ],
+  "requiredFeatures": [
+    "currentAqi"
+  ],
+  "featureStats": {
+    "co": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "coUnitHandling": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "currentAqi": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 117.0,
+      "p01": 30.909999999999968,
+      "p05": 41.0,
+      "p95": 369.0,
+      "p99": 433.0
+    },
+    "latitude": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 26.863,
+      "p01": 19.057,
+      "p05": 19.057,
+      "p95": 28.629,
+      "p99": 28.629
+    },
+    "longitude": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 77.241,
+      "p01": 72.859,
+      "p05": 72.859,
+      "p95": 80.999,
+      "p99": 80.999
+    },
+    "nh3": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "stationId": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "stationLatitude": {
+      "nonNullCount": 49750,
+      "nullCount": 10042,
+      "median": 26.863,
+      "p01": 19.057,
+      "p05": 19.057,
+      "p95": 28.629,
+      "p99": 28.629
+    },
+    "stationLongitude": {
+      "nonNullCount": 49750,
+      "nullCount": 10042,
+      "median": 77.241,
+      "p01": 72.859,
+      "p05": 72.859,
+      "p95": 80.999,
+      "p99": 80.999
+    },
+    "subIndexes": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "stationDistanceKm": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "temperatureCelsius": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "humidityPercent": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pressureHpa": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "windSpeedMps": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "windDirectionDegrees": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "rainfallMm": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "openWeatherAqiIndex": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "weather_temperatureCelsius": {
+      "nonNullCount": 20951,
+      "nullCount": 38841,
+      "median": 26.7,
+      "p01": 9.7,
+      "p05": 12.7,
+      "p95": 35.6,
+      "p99": 39.95
+    },
+    "weather_humidityPercent": {
+      "nonNullCount": 20951,
+      "nullCount": 38841,
+      "median": 70.0,
+      "p01": 12.0,
+      "p05": 24.0,
+      "p95": 96.0,
+      "p99": 99.0
+    },
+    "weather_pressureHpa": {
+      "nonNullCount": 20951,
+      "nullCount": 38841,
+      "median": 992.1,
+      "p01": 972.9,
+      "p05": 976.3,
+      "p95": 1009.1,
+      "p99": 1013.0
+    },
+    "weather_windSpeedMps": {
+      "nonNullCount": 20951,
+      "nullCount": 38841,
+      "median": 1.92,
+      "p01": 0.17,
+      "p05": 0.5,
+      "p95": 4.545,
+      "p99": 5.97
+    },
+    "weather_windDirectionDegrees": {
+      "nonNullCount": 20951,
+      "nullCount": 38841,
+      "median": 240.0,
+      "p01": 9.0,
+      "p05": 36.0,
+      "p95": 332.5,
+      "p99": 355.5
+    },
+    "weather_rainfallMm": {
+      "nonNullCount": 20951,
+      "nullCount": 38841,
+      "median": 0.0,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 0.8,
+      "p99": 3.9
+    },
+    "weather_cloudCoverPercent": {
+      "nonNullCount": 20951,
+      "nullCount": 38841,
+      "median": 16.0,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 100.0,
+      "p99": 100.0
+    },
+    "currentAqi_lag_1h": {
+      "nonNullCount": 59788,
+      "nullCount": 4,
+      "median": 117.0,
+      "p01": 30.870000000000005,
+      "p05": 41.0,
+      "p95": 369.0,
+      "p99": 433.0
+    },
+    "currentAqi_lag_3h": {
+      "nonNullCount": 59780,
+      "nullCount": 12,
+      "median": 117.0,
+      "p01": 30.789999999999964,
+      "p05": 41.0,
+      "p95": 369.0,
+      "p99": 433.0
+    },
+    "currentAqi_lag_6h": {
+      "nonNullCount": 59768,
+      "nullCount": 24,
+      "median": 117.0,
+      "p01": 30.66999999999996,
+      "p05": 41.0,
+      "p95": 369.0,
+      "p99": 433.0
+    },
+    "currentAqi_lag_12h": {
+      "nonNullCount": 59744,
+      "nullCount": 48,
+      "median": 117.0,
+      "p01": 30.430000000000064,
+      "p05": 41.0,
+      "p95": 369.0,
+      "p99": 433.0
+    },
+    "currentAqi_lag_24h": {
+      "nonNullCount": 59696,
+      "nullCount": 96,
+      "median": 117.0,
+      "p01": 30.0,
+      "p05": 41.0,
+      "p95": 369.0,
+      "p99": 433.0
+    },
+    "currentAqi_change_1h": {
+      "nonNullCount": 59788,
+      "nullCount": 4,
+      "median": 0.0,
+      "p01": -11.0,
+      "p05": -5.0,
+      "p95": 5.0,
+      "p99": 10.0
+    },
+    "currentAqi_change_3h": {
+      "nonNullCount": 59780,
+      "nullCount": 12,
+      "median": 0.0,
+      "p01": -28.0,
+      "p05": -14.0,
+      "p95": 14.0,
+      "p99": 27.0
+    },
+    "currentAqi_change_6h": {
+      "nonNullCount": 59768,
+      "nullCount": 24,
+      "median": 0.0,
+      "p01": -50.0,
+      "p05": -26.0,
+      "p95": 26.0,
+      "p99": 48.0
+    },
+    "currentAqi_change_24h": {
+      "nonNullCount": 59696,
+      "nullCount": 96,
+      "median": 1.0,
+      "p01": -135.0,
+      "p05": -72.0,
+      "p95": 69.0,
+      "p99": 120.0
+    },
+    "pm25_lag_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25_lag_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25_lag_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25_lag_12h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25_lag_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25_change_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25_change_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25_change_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25_change_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10_lag_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10_lag_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10_lag_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10_lag_12h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10_lag_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10_change_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10_change_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10_change_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm10_change_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2_lag_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2_lag_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2_lag_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2_lag_12h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2_lag_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2_change_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2_change_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2_change_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "no2_change_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2_lag_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2_lag_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2_lag_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2_lag_12h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2_lag_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2_change_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2_change_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2_change_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "so2_change_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "co_lag_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "co_lag_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "co_lag_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "co_lag_12h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "co_lag_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "co_change_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "co_change_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "co_change_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "co_change_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3_lag_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3_lag_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3_lag_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3_lag_12h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3_lag_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3_change_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3_change_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3_change_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "o3_change_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "nh3_lag_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "nh3_lag_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "nh3_lag_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "nh3_lag_12h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "nh3_lag_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "nh3_change_1h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "nh3_change_3h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "nh3_change_6h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "nh3_change_24h": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "pm25_pm10_ratio": {
+      "nonNullCount": 0,
+      "nullCount": 59792,
+      "median": null,
+      "p01": null,
+      "p05": null,
+      "p95": null,
+      "p99": null
+    },
+    "aqi_roll_3h_mean": {
+      "nonNullCount": 59784,
+      "nullCount": 8,
+      "median": 117.0,
+      "p01": 30.666666666666668,
+      "p05": 41.333333333333336,
+      "p95": 369.3333333333333,
+      "p99": 432.6666666666667
+    },
+    "aqi_roll_3h_median": {
+      "nonNullCount": 59784,
+      "nullCount": 8,
+      "median": 117.0,
+      "p01": 30.0,
+      "p05": 41.0,
+      "p95": 369.0,
+      "p99": 433.0
+    },
+    "aqi_roll_3h_min": {
+      "nonNullCount": 59784,
+      "nullCount": 8,
+      "median": 115.0,
+      "p01": 30.0,
+      "p05": 41.0,
+      "p95": 366.84999999999854,
+      "p99": 429.0
+    },
+    "aqi_roll_3h_max": {
+      "nonNullCount": 59784,
+      "nullCount": 8,
+      "median": 119.0,
+      "p01": 31.0,
+      "p05": 42.0,
+      "p95": 372.0,
+      "p99": 434.16999999999825
+    },
+    "aqi_roll_3h_std": {
+      "nonNullCount": 59784,
+      "nullCount": 8,
+      "median": 1.1547005383792557,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 7.094598884597623,
+      "p99": 12.538989948157566
+    },
+    "aqi_roll_3h_slope": {
+      "nonNullCount": 59776,
+      "nullCount": 16,
+      "median": 0.0,
+      "p01": -9.333333333333334,
+      "p05": -4.666666666666667,
+      "p95": 4.666666666666667,
+      "p99": 9.0
+    },
+    "aqi_roll_6h_mean": {
+      "nonNullCount": 59784,
+      "nullCount": 8,
+      "median": 117.0,
+      "p01": 30.833333333333332,
+      "p05": 41.333333333333336,
+      "p95": 369.1666666666667,
+      "p99": 432.0
+    },
+    "aqi_roll_6h_median": {
+      "nonNullCount": 59784,
+      "nullCount": 8,
+      "median": 117.0,
+      "p01": 30.5,
+      "p05": 41.0,
+      "p95": 369.5,
+      "p99": 432.5
+    },
+    "aqi_roll_6h_min": {
+      "nonNullCount": 59784,
+      "nullCount": 8,
+      "median": 112.0,
+      "p01": 29.0,
+      "p05": 40.0,
+      "p95": 362.0,
+      "p99": 425.0
+    },
+    "aqi_roll_6h_max": {
+      "nonNullCount": 59784,
+      "nullCount": 8,
+      "median": 122.0,
+      "p01": 33.0,
+      "p05": 43.0,
+      "p95": 375.0,
+      "p99": 438.0
+    },
+    "aqi_roll_6h_std": {
+      "nonNullCount": 59784,
+      "nullCount": 8,
+      "median": 2.3452078799717273,
+      "p01": 4.98288624195512e-07,
+      "p05": 0.4082482905465283,
+      "p95": 12.431478630283983,
+      "p99": 21.763394221451755
+    },
+    "aqi_roll_6h_slope": {
+      "nonNullCount": 59764,
+      "nullCount": 28,
+      "median": 0.0,
+      "p01": -8.333333333333334,
+      "p05": -4.333333333333333,
+      "p95": 4.333333333333333,
+      "p99": 8.0
+    },
+    "aqi_roll_12h_mean": {
+      "nonNullCount": 59776,
+      "nullCount": 16,
+      "median": 117.25,
+      "p01": 31.25,
+      "p05": 41.583333333333336,
+      "p95": 368.5,
+      "p99": 430.9375
+    },
+    "aqi_roll_12h_median": {
+      "nonNullCount": 59776,
+      "nullCount": 16,
+      "median": 117.0,
+      "p01": 31.0,
+      "p05": 41.0,
+      "p95": 369.5,
+      "p99": 431.5
+    },
+    "aqi_roll_12h_min": {
+      "nonNullCount": 59776,
+      "nullCount": 16,
+      "median": 108.0,
+      "p01": 27.0,
+      "p05": 39.0,
+      "p95": 356.0,
+      "p99": 419.0
+    },
+    "aqi_roll_12h_max": {
+      "nonNullCount": 59776,
+      "nullCount": 16,
+      "median": 127.0,
+      "p01": 35.0,
+      "p05": 45.0,
+      "p95": 381.0,
+      "p99": 443.0
+    },
+    "aqi_roll_12h_std": {
+      "nonNullCount": 59776,
+      "nullCount": 16,
+      "median": 4.501683186891973,
+      "p01": 0.38924947235914636,
+      "p05": 0.7177405623272165,
+      "p95": 20.997293965534876,
+      "p99": 36.48160079430076
+    },
+    "aqi_roll_12h_slope": {
+      "nonNullCount": 59740,
+      "nullCount": 52,
+      "median": 0.0,
+      "p01": -7.25,
+      "p05": -3.75,
+      "p95": 3.6666666666666665,
+      "p99": 6.75
+    },
+    "aqi_roll_24h_mean": {
+      "nonNullCount": 59760,
+      "nullCount": 32,
+      "median": 118.0,
+      "p01": 32.291666666666664,
+      "p05": 42.291666666666664,
+      "p95": 365.96041666666645,
+      "p99": 427.0833333333333
+    },
+    "aqi_roll_24h_median": {
+      "nonNullCount": 59760,
+      "nullCount": 32,
+      "median": 117.0,
+      "p01": 31.0,
+      "p05": 41.5,
+      "p95": 368.0,
+      "p99": 429.5
+    },
+    "aqi_roll_24h_min": {
+      "nonNullCount": 59760,
+      "nullCount": 32,
+      "median": 100.0,
+      "p01": 25.0,
+      "p05": 38.0,
+      "p95": 344.0,
+      "p99": 409.0
+    },
+    "aqi_roll_24h_max": {
+      "nonNullCount": 59760,
+      "nullCount": 32,
+      "median": 136.0,
+      "p01": 38.0,
+      "p05": 48.0,
+      "p95": 388.0,
+      "p99": 449.0
+    },
+    "aqi_roll_24h_std": {
+      "nonNullCount": 59760,
+      "nullCount": 32,
+      "median": 8.256639840101371,
+      "p01": 0.5835920755251246,
+      "p05": 1.214980369390987,
+      "p95": 33.442659934353685,
+      "p99": 55.772319237750516
+    },
+    "aqi_roll_24h_slope": {
+      "nonNullCount": 59692,
+      "nullCount": 100,
+      "median": 0.041666666666666664,
+      "p01": -5.625,
+      "p05": -3.0,
+      "p95": 2.875,
+      "p99": 5.0
+    },
+    "aqi_prev_day_same_hour": {
+      "nonNullCount": 59696,
+      "nullCount": 96,
+      "median": 117.0,
+      "p01": 30.0,
+      "p05": 41.0,
+      "p95": 369.0,
+      "p99": 433.0
+    },
+    "aqi_missing_3h_ratio": {
+      "nonNullCount": 59788,
+      "nullCount": 4,
+      "median": 0.0,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 0.0,
+      "p99": 0.0
+    },
+    "aqi_missing_6h_ratio": {
+      "nonNullCount": 59788,
+      "nullCount": 4,
+      "median": 0.0,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 0.0,
+      "p99": 0.0
+    },
+    "aqi_missing_12h_ratio": {
+      "nonNullCount": 59788,
+      "nullCount": 4,
+      "median": 0.0,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 0.0,
+      "p99": 0.0
+    },
+    "aqi_missing_24h_ratio": {
+      "nonNullCount": 59788,
+      "nullCount": 4,
+      "median": 0.0,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 0.0,
+      "p99": 0.0
+    },
+    "hour": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 11.0,
+      "p01": 0.0,
+      "p05": 1.0,
+      "p95": 22.0,
+      "p99": 23.0
+    },
+    "dayOfWeek": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 3.0,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 6.0,
+      "p99": 6.0
+    },
+    "month": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 7.0,
+      "p01": 1.0,
+      "p05": 1.0,
+      "p95": 12.0,
+      "p99": 12.0
+    },
+    "isWeekend": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 0.0,
+      "p01": 0.0,
+      "p05": 0.0,
+      "p95": 1.0,
+      "p99": 1.0
+    },
+    "season": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 3.0,
+      "p01": 1.0,
+      "p05": 1.0,
+      "p95": 4.0,
+      "p99": 4.0
+    },
+    "hourSin": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 1.2246467991473532e-16,
+      "p01": -1.0,
+      "p05": -0.9659258262890684,
+      "p95": 0.9659258262890683,
+      "p99": 1.0
+    },
+    "hourCos": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 6.123233995736766e-17,
+      "p01": -1.0,
+      "p05": -0.9659258262890683,
+      "p95": 0.9659258262890683,
+      "p99": 1.0
+    },
+    "dayOfWeekSin": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": 0.0,
+      "p01": -0.9749279121818236,
+      "p05": -0.9749279121818236,
+      "p95": 0.9749279121818236,
+      "p99": 0.9749279121818236
+    },
+    "dayOfWeekCos": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": -0.22252093395631434,
+      "p01": -0.9009688679024191,
+      "p05": -0.9009688679024191,
+      "p95": 1.0,
+      "p99": 1.0
+    },
+    "monthSin": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": -2.4492935982947064e-16,
+      "p01": -1.0,
+      "p05": -1.0,
+      "p95": 1.0,
+      "p99": 1.0
+    },
+    "monthCos": {
+      "nonNullCount": 59792,
+      "nullCount": 0,
+      "median": -1.8369701987210297e-16,
+      "p01": -1.0,
+      "p05": -1.0,
+      "p95": 1.0,
+      "p99": 1.0
+    },
+    "stationLatitudeFeature": {
+      "nonNullCount": 49750,
+      "nullCount": 10042,
+      "median": 26.863,
+      "p01": 19.057,
+      "p05": 19.057,
+      "p95": 28.629,
+      "p99": 28.629
+    },
+    "stationLongitudeFeature": {
+      "nonNullCount": 49750,
+      "nullCount": 10042,
+      "median": 77.241,
+      "p01": 72.859,
+      "p05": 72.859,
+      "p95": 80.999,
+      "p99": 80.999
+    }
+  },
+  "imputerDefaults": {
+    "co": null,
+    "coUnitHandling": null,
+    "currentAqi": 117.0,
+    "latitude": 26.863,
+    "longitude": 77.241,
+    "nh3": null,
+    "no2": null,
+    "o3": null,
+    "pm10": null,
+    "pm25": null,
+    "so2": null,
+    "stationId": null,
+    "stationLatitude": 26.863,
+    "stationLongitude": 77.241,
+    "subIndexes": null,
+    "stationDistanceKm": null,
+    "temperatureCelsius": null,
+    "humidityPercent": null,
+    "pressureHpa": null,
+    "windSpeedMps": null,
+    "windDirectionDegrees": null,
+    "rainfallMm": null,
+    "openWeatherAqiIndex": null,
+    "weather_temperatureCelsius": 26.7,
+    "weather_humidityPercent": 70.0,
+    "weather_pressureHpa": 992.1,
+    "weather_windSpeedMps": 1.92,
+    "weather_windDirectionDegrees": 240.0,
+    "weather_rainfallMm": 0.0,
+    "weather_cloudCoverPercent": 16.0,
+    "currentAqi_lag_1h": 117.0,
+    "currentAqi_lag_3h": 117.0,
+    "currentAqi_lag_6h": 117.0,
+    "currentAqi_lag_12h": 117.0,
+    "currentAqi_lag_24h": 117.0,
+    "currentAqi_change_1h": 0.0,
+    "currentAqi_change_3h": 0.0,
+    "currentAqi_change_6h": 0.0,
+    "currentAqi_change_24h": 1.0,
+    "pm25_lag_1h": null,
+    "pm25_lag_3h": null,
+    "pm25_lag_6h": null,
+    "pm25_lag_12h": null,
+    "pm25_lag_24h": null,
+    "pm25_change_1h": null,
+    "pm25_change_3h": null,
+    "pm25_change_6h": null,
+    "pm25_change_24h": null,
+    "pm10_lag_1h": null,
+    "pm10_lag_3h": null,
+    "pm10_lag_6h": null,
+    "pm10_lag_12h": null,
+    "pm10_lag_24h": null,
+    "pm10_change_1h": null,
+    "pm10_change_3h": null,
+    "pm10_change_6h": null,
+    "pm10_change_24h": null,
+    "no2_lag_1h": null,
+    "no2_lag_3h": null,
+    "no2_lag_6h": null,
+    "no2_lag_12h": null,
+    "no2_lag_24h": null,
+    "no2_change_1h": null,
+    "no2_change_3h": null,
+    "no2_change_6h": null,
+    "no2_change_24h": null,
+    "so2_lag_1h": null,
+    "so2_lag_3h": null,
+    "so2_lag_6h": null,
+    "so2_lag_12h": null,
+    "so2_lag_24h": null,
+    "so2_change_1h": null,
+    "so2_change_3h": null,
+    "so2_change_6h": null,
+    "so2_change_24h": null,
+    "co_lag_1h": null,
+    "co_lag_3h": null,
+    "co_lag_6h": null,
+    "co_lag_12h": null,
+    "co_lag_24h": null,
+    "co_change_1h": null,
+    "co_change_3h": null,
+    "co_change_6h": null,
+    "co_change_24h": null,
+    "o3_lag_1h": null,
+    "o3_lag_3h": null,
+    "o3_lag_6h": null,
+    "o3_lag_12h": null,
+    "o3_lag_24h": null,
+    "o3_change_1h": null,
+    "o3_change_3h": null,
+    "o3_change_6h": null,
+    "o3_change_24h": null,
+    "nh3_lag_1h": null,
+    "nh3_lag_3h": null,
+    "nh3_lag_6h": null,
+    "nh3_lag_12h": null,
+    "nh3_lag_24h": null,
+    "nh3_change_1h": null,
+    "nh3_change_3h": null,
+    "nh3_change_6h": null,
+    "nh3_change_24h": null,
+    "pm25_pm10_ratio": null,
+    "aqi_roll_3h_mean": 117.0,
+    "aqi_roll_3h_median": 117.0,
+    "aqi_roll_3h_min": 115.0,
+    "aqi_roll_3h_max": 119.0,
+    "aqi_roll_3h_std": 1.1547005383792557,
+    "aqi_roll_3h_slope": 0.0,
+    "aqi_roll_6h_mean": 117.0,
+    "aqi_roll_6h_median": 117.0,
+    "aqi_roll_6h_min": 112.0,
+    "aqi_roll_6h_max": 122.0,
+    "aqi_roll_6h_std": 2.3452078799717273,
+    "aqi_roll_6h_slope": 0.0,
+    "aqi_roll_12h_mean": 117.25,
+    "aqi_roll_12h_median": 117.0,
+    "aqi_roll_12h_min": 108.0,
+    "aqi_roll_12h_max": 127.0,
+    "aqi_roll_12h_std": 4.501683186891973,
+    "aqi_roll_12h_slope": 0.0,
+    "aqi_roll_24h_mean": 118.0,
+    "aqi_roll_24h_median": 117.0,
+    "aqi_roll_24h_min": 100.0,
+    "aqi_roll_24h_max": 136.0,
+    "aqi_roll_24h_std": 8.256639840101371,
+    "aqi_roll_24h_slope": 0.041666666666666664,
+    "aqi_prev_day_same_hour": 117.0,
+    "aqi_missing_3h_ratio": 0.0,
+    "aqi_missing_6h_ratio": 0.0,
+    "aqi_missing_12h_ratio": 0.0,
+    "aqi_missing_24h_ratio": 0.0,
+    "hour": 11.0,
+    "dayOfWeek": 3.0,
+    "month": 7.0,
+    "isWeekend": 0.0,
+    "season": 3.0,
+    "hourSin": 1.2246467991473532e-16,
+    "hourCos": 6.123233995736766e-17,
+    "dayOfWeekSin": 0.0,
+    "dayOfWeekCos": -0.22252093395631434,
+    "monthSin": -2.4492935982947064e-16,
+    "monthCos": -1.8369701987210297e-16,
+    "stationLatitudeFeature": 26.863,
+    "stationLongitudeFeature": 77.241
+  },
+  "trainingDeltaPercentiles": {
+    "p01": -163.0,
+    "p05": -93.0,
+    "p50": 1.0,
+    "p95": 88.0,
+    "p99": 148.0
+  },
+  "ridgeDiagnostics": null,
+  "trainingRowCount": 59792,
+  "trainingDateRange": [
+    "2022-12-31T18:00:00+00:00",
+    "2025-12-29T17:00:00+00:00"
+  ],
+  "testRowCount": 26804,
+  "datasetChecksum": "ffcc387530b78b702ddf036d1dac1acec141e4a31335a48a482e5bc4b8e07234",
+  "metrics": {
+    "sample_count": 26804,
+    "mae": 37.88581359528636,
+    "rmse": 51.8970725169704,
+    "mean_bias": -0.1160463683404007,
+    "median_absolute_error": 27.664389729499817,
+    "category_accuracy": 0.5768168930010447,
+    "interval_coverage": null
+  },
+  "bestBaseline": "persistence",
+  "baselineMetrics": {
+    "sample_count": 26804,
+    "mae": 41.15896881062528,
+    "rmse": 57.04117399315895,
+    "mean_bias": -0.9336293090583495,
+    "median_absolute_error": 29.0,
+    "category_accuracy": 0.5464109834353081,
+    "interval_coverage": null
+  },
+  "allBaselines": {
+    "persistence": {
+      "sample_count": 26804,
+      "mae": 41.15896881062528,
+      "rmse": 57.04117399315895,
+      "mean_bias": -0.9336293090583495,
+      "median_absolute_error": 29.0,
+      "category_accuracy": 0.5464109834353081,
+      "interval_coverage": null
+    },
+    "seasonal": {
+      "sample_count": 26804,
+      "mae": 47.020780480525296,
+      "rmse": 64.45327768027617,
+      "mean_bias": -1.2529100134308313,
+      "median_absolute_error": 35.0,
+      "category_accuracy": 0.5005596179674675,
+      "interval_coverage": null
+    },
+    "week": {
+      "sample_count": 26804,
+      "mae": 56.134606775108196,
+      "rmse": 77.23489203707035,
+      "mean_bias": -3.8395761826593047,
+      "median_absolute_error": 40.0,
+      "category_accuracy": 0.4622444411281898,
+      "interval_coverage": null
+    },
+    "trend": {
+      "sample_count": 26804,
+      "mae": 55.557006416952696,
+      "rmse": 75.91180654404282,
+      "mean_bias": -0.16310998358453963,
+      "median_absolute_error": 41.0,
+      "category_accuracy": 0.4603417400388002,
+      "interval_coverage": null
+    }
+  },
+  "modelComparison": {
+    "HGB": {
+      "family": "SKLEARN_HIST_GRADIENT_BOOSTING",
+      "avg_val_rmse": 50.3050503680386
+    },
+    "RIDGE": {
+      "family": "SKLEARN_RIDGE",
+      "avg_val_rmse": 51.660508925042684
+    },
+    "HUBER": {
+      "family": "SKLEARN_HUBER",
+      "avg_val_rmse": 51.03395070267836
+    },
+    "XGB": {
+      "family": "XGBOOST",
+      "avg_val_rmse": 48.68851839668951
+    }
+  },
+  "sparseValidation": {},
+  "sparsePromotionStatus": null,
+  "walkForwardStable": true,
+  "heldOutStationEvaluation": {
+    "bandra_kurla_complex_mumbai_iitm": {
+      "sample_count": 1049,
+      "mae": 52.37227555443919,
+      "rmse": 69.85291006608696,
+      "mean_bias": 10.121383641969885,
+      "median_absolute_error": 38.354475021362305,
+      "category_accuracy": 0.4251668255481411,
+      "interval_coverage": null
+    },
+    "bandra_kurla_complex_mumbai_mpcb": {
+      "sample_count": 3449,
+      "mae": 34.05302027964014,
+      "rmse": 48.96491889173054,
+      "mean_bias": 9.902511482482636,
+      "median_absolute_error": 23.92357349395752,
+      "category_accuracy": 0.6094520150768339,
+      "interval_coverage": null
+    },
+    "gomti_nagar_lucknow_uppcb": {
+      "sample_count": 11428,
+      "mae": 34.22465462936398,
+      "rmse": 45.70257924623301,
+      "mean_bias": -0.3056361869862254,
+      "median_absolute_error": 26.149914026260376,
+      "category_accuracy": 0.5679908995449773,
+      "interval_coverage": null
+    },
+    "ito_delhi_cpcb": {
+      "sample_count": 10878,
+      "mae": 41.55034110154425,
+      "rmse": 56.66929168468052,
+      "mean_bias": -4.080602137858663,
+      "median_absolute_error": 30.696985244750977,
+      "category_accuracy": 0.5903658760801618,
+      "interval_coverage": null
+    }
+  },
+  "heldOutCityEvaluation": {
+    "Delhi": {
+      "sample_count": 10878,
+      "mae": 41.55034110154425,
+      "rmse": 56.66929168468052,
+      "mean_bias": -4.080602137858663,
+      "median_absolute_error": 30.696985244750977,
+      "category_accuracy": 0.5903658760801618,
+      "interval_coverage": null
+    },
+    "Lucknow": {
+      "sample_count": 11428,
+      "mae": 34.22465462936398,
+      "rmse": 45.70257924623301,
+      "mean_bias": -0.3056361869862254,
+      "median_absolute_error": 26.149914026260376,
+      "category_accuracy": 0.5679908995449773,
+      "interval_coverage": null
+    },
+    "Mumbai": {
+      "sample_count": 4498,
+      "mae": 38.32534104070376,
+      "rmse": 54.556127204099646,
+      "mean_bias": 9.953555701091378,
+      "median_absolute_error": 26.85818386077881,
+      "category_accuracy": 0.5664739884393064,
+      "interval_coverage": null
+    }
+  },
+  "stationGroupedEvaluation": {
+    "bandra_kurla_complex_mumbai_iitm": {
+      "city": "Mumbai",
+      "trainRows": 57404,
+      "testRows": 2388,
+      "metrics": {
+        "sample_count": 2388,
+        "mae": 33.54699207354849,
+        "rmse": 49.117546964032066,
+        "mean_bias": 4.123937304690168,
+        "median_absolute_error": 22.779951572418213,
+        "category_accuracy": 0.5804020100502513,
+        "interval_coverage": null,
+        "p90_absolute_error": 79.12520408630384,
+        "pct_change_gt_100": 0.0
+      },
+      "persistenceBaseline": {
+        "sample_count": 2388,
+        "mae": 34.93174204355109,
+        "rmse": 53.694382233312695,
+        "mean_bias": -1.4309045226130652,
+        "median_absolute_error": 21.0,
+        "category_accuracy": 0.5439698492462312,
+        "interval_coverage": null,
+        "p90_absolute_error": 84.0,
+        "pct_change_gt_100": 0.0
+      },
+      "oodRate": 0.44974874371859297
+    },
+    "bandra_kurla_complex_mumbai_mpcb": {
+      "city": "Mumbai",
+      "trainRows": 52071,
+      "testRows": 7721,
+      "metrics": {
+        "sample_count": 7721,
+        "mae": 41.03534653045144,
+        "rmse": 59.74474853026287,
+        "mean_bias": -15.77448646873916,
+        "median_absolute_error": 28.71186852455139,
+        "category_accuracy": 0.5482450459785002,
+        "interval_coverage": null,
+        "p90_absolute_error": 98.56321334838867,
+        "pct_change_gt_100": 8.69058412122782
+      },
+      "persistenceBaseline": {
+        "sample_count": 7721,
+        "mae": 29.95661183784484,
+        "rmse": 45.63518383753381,
+        "mean_bias": 1.0367828001554202,
+        "median_absolute_error": 17.0,
+        "category_accuracy": 0.5996632560549152,
+        "interval_coverage": null,
+        "p90_absolute_error": 76.0,
+        "pct_change_gt_100": 0.0
+      },
+      "oodRate": 1.0
+    },
+    "gomti_nagar_lucknow_uppcb": {
+      "city": "Lucknow",
+      "trainRows": 34340,
+      "testRows": 25452,
+      "metrics": {
+        "sample_count": 25452,
+        "mae": 43.17596301587692,
+        "rmse": 56.48944987759451,
+        "mean_bias": 25.483249486833277,
+        "median_absolute_error": 31.540295600891113,
+        "category_accuracy": 0.45045575986170044,
+        "interval_coverage": null,
+        "p90_absolute_error": 96.9450019836426,
+        "pct_change_gt_100": 4.997642621404998
+      },
+      "persistenceBaseline": {
+        "sample_count": 25452,
+        "mae": 35.54141128398554,
+        "rmse": 49.75170867526817,
+        "mean_bias": 0.0034574886060034574,
+        "median_absolute_error": 25.0,
+        "category_accuracy": 0.5355571271412856,
+        "interval_coverage": null,
+        "p90_absolute_error": 82.0,
+        "pct_change_gt_100": 0.0
+      },
+      "oodRate": 1.0
+    },
+    "ito_delhi_cpcb": {
+      "city": "Delhi",
+      "trainRows": 35561,
+      "testRows": 24231,
+      "metrics": {
+        "sample_count": 24231,
+        "mae": 61.28117895282528,
+        "rmse": 86.37165818870261,
+        "mean_bias": -45.5536870133783,
+        "median_absolute_error": 37.99165725708008,
+        "category_accuracy": 0.4985349345879246,
+        "interval_coverage": null,
+        "p90_absolute_error": 157.8315658569336,
+        "pct_change_gt_100": 20.065205728199416
+      },
+      "persistenceBaseline": {
+        "sample_count": 24231,
+        "mae": 44.22648673187239,
+        "rmse": 62.511594071332965,
+        "mean_bias": -0.22401056497874625,
+        "median_absolute_error": 30.0,
+        "category_accuracy": 0.586438859312451,
+        "interval_coverage": null,
+        "p90_absolute_error": 103.0,
+        "pct_change_gt_100": 0.0
+      },
+      "oodRate": 1.0
+    }
+  },
+  "heldOutValidationFailures": [
+    {
+      "station": "bandra_kurla_complex_mumbai_mpcb",
+      "city": "Mumbai",
+      "testRows": 7721,
+      "reasons": [
+        "MAE_BASELINE_BETTER",
+        "RMSE_BASELINE_BETTER"
+      ],
+      "modelMae": 41.03534653045144,
+      "persistenceMae": 29.95661183784484,
+      "modelRmse": 59.74474853026287,
+      "persistenceRmse": 45.63518383753381,
+      "bias": -15.77448646873916
+    },
+    {
+      "station": "gomti_nagar_lucknow_uppcb",
+      "city": "Lucknow",
+      "testRows": 25452,
+      "reasons": [
+        "MAE_BASELINE_BETTER",
+        "RMSE_BASELINE_BETTER",
+        "BIAS_TOO_HIGH"
+      ],
+      "modelMae": 43.17596301587692,
+      "persistenceMae": 35.54141128398554,
+      "modelRmse": 56.48944987759451,
+      "persistenceRmse": 49.75170867526817,
+      "bias": 25.483249486833277
+    },
+    {
+      "station": "ito_delhi_cpcb",
+      "city": "Delhi",
+      "testRows": 24231,
+      "reasons": [
+        "MAE_BASELINE_BETTER",
+        "RMSE_BASELINE_BETTER",
+        "BIAS_TOO_HIGH"
+      ],
+      "modelMae": 61.28117895282528,
+      "persistenceMae": 44.22648673187239,
+      "modelRmse": 86.37165818870261,
+      "persistenceRmse": 62.511594071332965,
+      "bias": -45.5536870133783
+    }
+  ],
+  "heldOutValidationStatus": "FAILED_HELDOUT_BASELINE",
+  "trainingRowsPerStation": {
+    "bandra_kurla_complex_mumbai_iitm": 2436,
+    "bandra_kurla_complex_mumbai_mpcb": 7769,
+    "gomti_nagar_lucknow_uppcb": 25500,
+    "ito_delhi_cpcb": 24279,
+    "kurla_mumbai_mpcb": 2,
+    "lalbagh_lucknow_cpcb": 2,
+    "talkatora_garden_delhi_dpcc": 6
+  },
+  "trainingStationCount": 4,
+  "trainingCities": [
+    "Delhi",
+    "Lucknow",
+    "Mumbai"
+  ],
+  "heldOutStationCount": 4,
+  "coverageScope": "LIMITED_STATION_COVERAGE",
+  "generalizationStatus": "LIMITED_STATION_COVERAGE",
+  "coverageLabel": "LIMITED_STATION_COVERAGE",
+  "oodPolicy": {
+    "lowMaxScore": 0.05,
+    "mediumMaxScore": 0.15,
+    "mediumRequiresHeldOutRobust": true,
+    "highFallbackReason": "OUT_OF_DISTRIBUTION_FEATURES"
+  },
+  "promotionStatus": "REJECTED_HELDOUT_BASELINE_BETTER",
+  "promotedAt": null,
+  "residualQuantiles": {
+    "p10": -58.059144210815425,
+    "p90": 65.4400908470154
+  },
+  "currentPromotedComparison": {
+    "status": "CURRENT_MODEL_RETAINED",
+    "currentModelId": "aqi-48h-xgb-GLOBAL_SHORT_HISTORY",
+    "currentVersion": "aqi-48h-xgb-GLOBAL_SHORT_HISTORY",
+    "currentRmse": 53.413910580121396,
+    "newRmse": 51.8970725169704,
+    "requiredRmseForPromotion": 50.74321505111532,
+    "minImprovementPercent": 5.0,
+    "newModelBetter": false
+  }
+}

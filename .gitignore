@@ -209,3 +209,10 @@ mongod-local-*.log
 ai-service/data/
 ai-service/models/
 ai-service/models_test/
+
+.env
+.env.*
+!.env.example
+
+!ai-service/models/
+!ai-service/models/**
