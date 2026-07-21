@@ -32,7 +32,16 @@ def load_promoted(model_dir: str | Path, standard: str, horizon: int, location_k
         scoped = [metadata for metadata in matches if metadata.get("modelScope") == scope]
         if scoped:
             metadata = sorted(scoped, key=lambda item: item.get("promotedAt") or "", reverse=True)[0]
-            artifact = joblib.load(metadata["artifactPath"])
+            raw_artifact_path = str(metadata["artifactPath"]).replace("\\", "/")
+            artifact_path = Path(raw_artifact_path)
+
+            if not artifact_path.is_absolute():
+                if artifact_path.parts and artifact_path.parts[0] == model_dir.name:
+                    artifact_path = model_dir.parent / artifact_path
+                else:
+                    artifact_path = model_dir / artifact_path
+
+            artifact = joblib.load(artifact_path)
             return artifact["pipeline"], metadata
     return None, None
 
