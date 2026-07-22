@@ -1,7 +1,7 @@
 # AirSense Environmental Intelligence Platform
 
 ## Overview
-A comprehensive platform for air-quality monitoring, forecasting, attribution, enforcement recommendation, and citizen advisory across multiple cities. The system combines real-time sensor ingestion, AI-driven attribution, hyper-local forecasts, and a rich UI for government officials, citizens, and public displays.
+A comprehensive platform for air-quality monitoring, forecasting, attribution, enforcement recommendation, and citizen advisory across multiple cities. The system combine real-time sensor ingestion, AI-driven attribution, hyper-local forecasts, and a rich UI for government officials, citizens, and public displays.
 
 ## Tech Stack
 - **Backend**: Spring Boot (Java) with MongoDB
