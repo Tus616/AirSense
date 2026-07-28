@@ -10,12 +10,12 @@ import java.util.List;
 @Component
 @ConfigurationProperties(prefix = "forecast.retraining")
 public class ForecastRetrainingProperties {
-    private boolean enabled = true;
+    private boolean enabled = false;
     private String dailyQualityCron = "0 15 1 * * *";
     private String trainingCron = "0 30 2 ? * SUN";
     private String schedule = "weekly";
-    private String aiServiceDirectory = "../ai-service";
-    private String pythonExecutable = "../ai-service/venv/Scripts/python.exe";
+    private String aiServiceDirectory = "";
+    private String pythonExecutable = "python";
     private String modelDir = "models";
     private String aqiStandard = "INDIA_NAQI";
     private List<String> scopes = List.of(

@@ -1,10 +1,14 @@
 import { formatPercent, formatScore, getAqiTone, getForecastPoints, labelize, toDisplayText } from "./decisionUtils";
 
 function forecastStatus(point, forecastResult) {
-  const mode = point?.mode || forecastResult?.mode || "";
-  if (mode.startsWith("ML_") && point?.modelPromotionStatus === "PROMOTED") return "Validated ML model";
-  if (mode === "TREND_WEATHER_V1") return "Trend-weather heuristic";
-  if (mode === "PERSISTENCE") return "Persistence baseline";
+  const mode = point?.engine || point?.mode || forecastResult?.mode || "";
+  if (mode === "CHRONOS_BOLT_ZERO_SHOT") return "Pretrained AI Forecast";
+  if (mode === "OPEN_METEO_PROVIDER_FORECAST") return "Atmospheric Provider Forecast";
+  if (mode === "PERSISTENCE_FALLBACK") return "Persistence Fallback";
+  if (mode === "UNAVAILABLE") return "Forecast Unavailable";
+  if (mode === "ML_PROMOTED" || (mode.startsWith("ML_") && point?.modelPromotionStatus === "PROMOTED")) return "Validated ML Model";
+  if (mode === "TREND_WEATHER_V1") return "Trend + Weather";
+  if (mode === "PERSISTENCE" || mode === "PERSISTENCE_FALLBACK") return "Persistence Fallback";
   if (mode === "UNAVAILABLE" || point?.predictedAqi === null || point?.predictedAqi === undefined) return "Unavailable";
   return labelize(mode, "Unavailable");
 }
@@ -21,19 +25,26 @@ function fallbackReasonLabel(reason) {
     LIVE_HISTORY_GAP_TOO_LARGE: "Live history gap is too large",
     CHECKSUM_MISMATCH: "Model checksum mismatch",
     FALLBACK_ENGINE_USED: "Fallback engine used",
+    CHRONOS_LOAD_FAILED: "Pretrained model unavailable",
+    CHRONOS_UNAVAILABLE: "Pretrained model unavailable",
+    INSUFFICIENT_HISTORY_FOR_CHRONOS: "Insufficient history for pretrained model",
+    PROVIDER_FORECAST_UNAVAILABLE: "Provider forecast unavailable",
+    PROVIDER_FORECAST_STANDARD_MISMATCH: "Provider forecast uses a different AQI standard",
+    CURRENT_AQI_UNAVAILABLE: "Current AQI unavailable",
   };
-  return labels[reason] || labelize(reason, "Fallback reason unavailable");
+  return String(reason || "")
+    .split(";")
+    .filter(Boolean)
+    .map((part) => labels[part] || labelize(part, "Fallback reason unavailable"))
+    .join(" / ");
 }
 
 export default function ForecastStrip({ forecastResult, activeHorizon }) {
   const points = getForecastPoints(forecastResult);
-  const forecastMode = forecastResult?.mode
-    ? forecastResult.mode
-    : forecastResult?.modelVersion
-      ? forecastResult.modelVersion
-      : forecastResult?.fallbackUsed
-        ? "UNAVAILABLE"
-        : "unavailable";
+  const forecastMode = forecastResult?.engine
+    || forecastResult?.mode
+    || forecastResult?.modelVersion
+    || (forecastResult?.fallbackUsed ? "PERSISTENCE_FALLBACK" : "UNAVAILABLE");
 
   return (
     <section className="decision-panel">
@@ -67,7 +78,8 @@ export default function ForecastStrip({ forecastResult, activeHorizon }) {
         {points.map((point) => {
           const unavailable = point.predictedAqi === null || point.predictedAqi === undefined || point.predictedAqi === "";
           const baseline = forecastResult?.baseline?.[point.key];
-          const mode = point.mode
+              const mode = point.engine
+            || point.mode
             || point.modelVersion
             || forecastResult?.mode
             || forecastResult?.modelVersion
@@ -175,7 +187,7 @@ export default function ForecastStrip({ forecastResult, activeHorizon }) {
               </dl>
               <p>
                 {unavailable
-                  ? "Forecast unavailable because no trustworthy current AQI was returned."
+                  ? "Forecast unavailable"
                   : toDisplayText(point.explanation || point.meteorologicalInfluence, "No forecast explanation returned.")}
               </p>
               {Array.isArray(point.insufficiencyReasons) && point.insufficiencyReasons.length > 0 ? (

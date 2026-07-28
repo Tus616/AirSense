@@ -224,7 +224,7 @@ class ForecastOrchestratorTest {
         ForecastPoint point = result.getForecast().get("24h");
         assertThat(point.getMode()).isEqualTo("ML_HIST_GRADIENT_BOOSTING");
         assertThat(point.getPredictedAqi()).isEqualTo(203);
-        assertThat(point.getModelPromotionStatus()).isEqualTo("PROMOTED");
+        assertThat(point.getModelPromotionStatus()).isEqualTo("NOT_APPLICABLE");
         assertThat(point.getBaselinePredictedAqi()).isEqualTo(184);
         assertThat(point.getValidationRmse()).isEqualTo(18.4);
         assertThat(point.getBaselineRmse()).isEqualTo(25.8);
@@ -279,7 +279,7 @@ class ForecastOrchestratorTest {
     }
 
     @Test
-    void unpromotedGlobalModelCannotRun() {
+    void unpromotedGlobalModelDoesNotBlockPretrainedLiveRequest() {
         ForecastOrchestrator orchestrator = orchestrator();
         MlForecastProperties properties = new MlForecastProperties();
         properties.setEnabled(true);
@@ -296,6 +296,7 @@ class ForecastOrchestratorTest {
                 .build();
         when(registryRepository.findFirstByAqiStandardAndHorizonHoursAndModelScopeAndActiveTrueOrderByPromotedAtDesc(
                 anyString(), anyInt(), anyString())).thenReturn(Optional.of(rejectedGlobal));
+        when(client.predict(any(MlForecastClient.MlForecastRequest.class))).thenReturn(Optional.empty());
         ReflectionTestUtils.setField(orchestrator, "configuredMlProperties", properties);
         ReflectionTestUtils.setField(orchestrator, "mlForecastClient", client);
         ReflectionTestUtils.setField(orchestrator, "modelRegistryRepository", registryRepository);
@@ -309,7 +310,7 @@ class ForecastOrchestratorTest {
         );
 
         assertThat(result.getForecast().get("24h").getMode()).isEqualTo("TREND_WEATHER_V1");
-        verify(client, org.mockito.Mockito.never()).predict(any());
+        verify(client).predict(any());
     }
 
     @Test

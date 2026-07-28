@@ -1,12 +1,12 @@
 
 from fastapi.testclient import TestClient
-from main import app, _eligible_candidate_scopes, InternalForecastPredictionRequest
+from main import app, _eligible_candidate_scopes, InternalForecastPredictionRequest, chronos_service
 import pandas as pd
 
 client = TestClient(app)
 
 
-def fresh_history(location_key="in:26.863:80.999", standard="INDIA_NAQI", hours=73):
+def fresh_history(location_key="in:26.863:80.999", standard="INDIA_NAQI", hours=169):
     issue_time = pd.Timestamp.now(tz="UTC").floor("h")
     start = issue_time - pd.Timedelta(hours=hours - 1)
     return issue_time.isoformat(), [
@@ -19,13 +19,21 @@ def fresh_history(location_key="in:26.863:80.999", standard="INDIA_NAQI", hours=
         for i in range(hours)
     ]
 
-def test_lucknow_promoted_model_selection_and_inference():
+def test_lucknow_chronos_zero_shot_selection_and_inference(monkeypatch):
+    class FakeChronos:
+        predicted_aqi = 161.0
+        lower_bound = 140.0
+        upper_bound = 184.0
+
+    monkeypatch.setattr(chronos_service, "predict", lambda values, horizons: ({h: FakeChronos() for h in horizons}, None))
     issue_time, history = fresh_history()
     response = client.post("/internal/forecast/predict", json={
         "snapshotId": "snap-123",
         "locationKey": "in:26.853:80.999", # searched
         "stationLocationKey": "in:26.863:80.999", # station actual
         "forecastIssueTime": issue_time,
+        "latitude": 26.863,
+        "longitude": 80.999,
         "forecastStandard": "INDIA_NAQI",
         "currentAqi": 150,
         "horizons": [24, 48, 72],
@@ -37,12 +45,26 @@ def test_lucknow_promoted_model_selection_and_inference():
     assert data["snapshotId"] == "snap-123"
     assert data["locationKey"] == "in:26.853:80.999"
     for p in data["predictions"]:
-        assert p["status"] == "PROMOTED"
-        assert p["engine"] == "ML_STATION_XGBOOST"
-        assert p["forecastScope"] == "STATION_SPECIFIC_ML"
+        assert p["status"] == "FORECAST"
+        assert p["engine"] == "CHRONOS_BOLT_ZERO_SHOT"
+        assert p["modelFamily"] == "CHRONOS_BOLT"
         assert p["predictedAqi"] >= 0
 
-def test_rejected_global_cold_start_cannot_run_for_delhi_mumbai():
+
+def test_readiness_and_forecast_status_endpoints():
+    ready = client.get("/ready")
+    assert ready.status_code == 200
+    assert ready.json()["providerClientConfigured"] is True
+
+    status = client.get("/internal/forecast/status")
+    assert status.status_code == 200
+    data = status.json()
+    assert set([24, 48, 72]).issubset(set(data["supportedHorizons"]))
+    assert data["providerFallbackAvailable"] is True
+    assert "CHRONOS_BOLT_ZERO_SHOT" in data["loadedEngineNames"]
+
+def test_promoted_artifact_absence_uses_persistence_for_delhi_mumbai(monkeypatch):
+    monkeypatch.setattr(chronos_service, "predict", lambda values, horizons: ({}, "INSUFFICIENT_HISTORY_FOR_CHRONOS"))
     for loc, latitude, longitude in [
         ("in:28.629:77.241", 28.629, 77.241),
         ("in:19.057:72.859", 19.057, 72.859),
@@ -64,24 +86,51 @@ def test_rejected_global_cold_start_cannot_run_for_delhi_mumbai():
             "history": history,
         })
         data = response.json()
-        assert data["predictions"][0]["status"] == "ARTIFACT_UNAVAILABLE"
-        assert data["predictions"][0]["fallbackReason"] == "MODEL_NOT_PROMOTED"
+        assert data["predictions"][0]["status"] == "FORECAST"
+        assert data["predictions"][0]["engine"] == "PERSISTENCE_FALLBACK"
+        assert data["predictions"][0]["predictedAqi"] == 150
 
-def test_schema_mismatch_fallback():
+def test_provider_forecast_fallback(monkeypatch):
+    monkeypatch.setattr(chronos_service, "predict", lambda values, horizons: ({}, "CHRONOS_LOAD_FAILED"))
+
+    class FakeProvider:
+        enabled = True
+
+        def fetch(self, *args, **kwargs):
+            from forecasting.inference.open_meteo_client import ProviderSeries
+            now = pd.Timestamp.now(tz="UTC").floor("h")
+            return ProviderSeries(
+                observations=[
+                    {"timestamp": (now - pd.Timedelta(hours=i)).isoformat(), "currentAqi": 80 + i % 4, "aqiStandard": "US_AQI"}
+                    for i in range(60, 0, -1)
+                ],
+                hourly_forecast=[
+                    {"timestamp": (now + pd.Timedelta(hours=h)).isoformat(), "currentAqi": 90 + h, "aqiStandard": "US_AQI"}
+                    for h in [24, 48, 72]
+                ],
+                provider="OPEN_METEO",
+                aqi_standard="US_AQI",
+                selected_aqi_field="us_aqi",
+                metadata={},
+            )
+
+    import main
+    monkeypatch.setattr(main, "open_meteo_client", FakeProvider())
     issue_time, history = fresh_history()
     response = client.post("/internal/forecast/predict", json={
         "snapshotId": "snap-123",
         "locationKey": "in:26.863:80.999",
+        "latitude": 26.863,
+        "longitude": 80.999,
         "forecastIssueTime": issue_time,
-        "forecastStandard": "INDIA_NAQI",
+        "forecastStandard": "US_AQI",
         "currentAqi": 150,
-        "horizons": [24],
-        "features": {"featureSchemaVersion": "invalid-schema-v999", "currentAqi": 150},
-        "history": history,
+        "horizons": [24, 48, 72],
+        "history": [],
     })
     data = response.json()
-    assert data["predictions"][0]["status"] == "SCHEMA_MISMATCH"
-    assert data["predictions"][0]["fallbackReason"] == "FEATURE_SCHEMA_MISMATCH"
+    assert [p["engine"] for p in data["predictions"]] == ["OPEN_METEO_PROVIDER_FORECAST"] * 3
+    assert data["predictions"][0]["predictedAqi"] is not None
 
 
 def test_delta_target_converts_to_absolute_once(monkeypatch):
@@ -224,7 +273,8 @@ def test_low_ood_reduces_confidence_and_optional_missing_is_imputed(monkeypatch)
     assert "pm25" not in result["featureDiagnostics"]["measuredFeatureNames"]
 
 
-def test_rejected_72h_global_cold_start_cannot_run():
+def test_rejected_72h_global_cold_start_uses_persistence(monkeypatch):
+    monkeypatch.setattr(chronos_service, "predict", lambda values, horizons: ({}, "INSUFFICIENT_HISTORY_FOR_CHRONOS"))
     result = client.post("/internal/forecast/predict", json={
         "snapshotId": "snap-72-rejected",
         "locationKey": "in:28.629:77.241",
@@ -240,8 +290,9 @@ def test_rejected_72h_global_cold_start_cannot_run():
         "history": [],
     }).json()
 
-    assert result["predictions"][0]["status"] == "ARTIFACT_UNAVAILABLE"
-    assert result["predictions"][0]["fallbackReason"] == "MODEL_NOT_PROMOTED"
+    assert result["predictions"][0]["status"] == "FORECAST"
+    assert result["predictions"][0]["engine"] == "PERSISTENCE_FALLBACK"
+    assert result["predictions"][0]["predictedAqi"] == 176
 
 
 def test_missing_feature_schema_is_rejected(monkeypatch):
@@ -291,7 +342,7 @@ def test_old_archive_history_is_rejected_for_live_forecast():
 
 def test_large_gap_history_is_rejected():
     issue_time, history = fresh_history()
-    del history[20:28]
+    del history[-48:-40]
     request = InternalForecastPredictionRequest(
         snapshotId="snap-gap",
         locationKey="in:26.863:80.999",

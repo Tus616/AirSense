@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings as PydanticBaseSettings
 from pydantic_settings import SettingsConfigDict
 from typing import List, Optional
@@ -10,14 +10,18 @@ import pymongo
 from datetime import datetime, timedelta, timezone
 import pandas as pd
 import logging
+from pathlib import Path
 
 from data_prep import prepare_data, prepare_inference_features
 from model import (
     train_models, load_models, predict_forecast,
     get_feature_importance, get_feature_importance_labeled,
 )
-from forecasting.inference.predict import predict as promoted_forecast_predict
+from forecasting.inference.predict import discover_registry, predict as promoted_forecast_predict, resolve_model_dir
 from forecasting.features.dataset import build_hourly_dataset
+from forecasting.inference.chronos_service import ChronosService
+from forecasting.inference.history import finite_number, prepare_aqi_history
+from forecasting.inference.open_meteo_client import AQI_STANDARD as OPEN_METEO_AQI_STANDARD, OpenMeteoAirQualityClient
 
 
 logger = logging.getLogger("airsense-ai")
@@ -29,11 +33,22 @@ class Settings(PydanticBaseSettings):
     fastapi_host: str = "0.0.0.0"
     fastapi_port: int = 8000
     training_lookback_days: int = 30
-    ml_model_dir: str = "models"
-    live_history_min_coverage_percent: float = 80.0
+    model_dir: str = "models"
+    model_registry_path: Optional[str] = None
+    ml_model_dir: Optional[str] = None
+    live_history_lookback_hours: int = 168
+    live_history_min_coverage_percent: float = 85.0
     live_history_max_gap_hours: float = 3.0
     live_history_max_age_minutes: float = 180.0
-    live_history_min_hours: float = 72.0
+    live_history_small_gap_interpolation_hours: float = 1.0
+    live_history_min_observations: int = 143
+    live_history_min_hours: float = 168.0
+    chronos_model_id: str = "amazon/chronos-bolt-tiny"
+    chronos_device: str = "cpu"
+    chronos_min_history_hours: int = 48
+    chronos_context_hours: int = 168
+    chronos_enabled: bool = True
+    open_meteo_forecast_enabled: bool = True
 
     # CORS — comma-separated list of allowed origins.
     # Do NOT use '*' in production when allow_credentials=True.
@@ -51,6 +66,19 @@ class Settings(PydanticBaseSettings):
 
 
 settings = Settings()
+chronos_service = ChronosService()
+open_meteo_client = OpenMeteoAirQualityClient()
+STARTUP_STATE = {
+    "applicationInitialized": False,
+    "inferenceModuleImported": True,
+    "modelRegistryDiagnostics": {},
+    "startupWarnings": [],
+    "providerClientConfigured": True,
+}
+
+
+def configured_model_dir() -> Path:
+    return resolve_model_dir(settings.ml_model_dir or settings.model_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -58,9 +86,16 @@ settings = Settings()
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: attempt to load saved model into memory
-    loaded = load_models()
-    print(f"Model loaded on startup: {loaded}")
+    logger.info("AI service model directory resolved to %s", configured_model_dir())
+    STARTUP_STATE["modelRegistryDiagnostics"] = discover_registry(configured_model_dir(), load_models=False)
+    STARTUP_STATE["startupWarnings"] = STARTUP_STATE["modelRegistryDiagnostics"].get("startupWarnings", [])
+    try:
+        loaded = load_models()
+        logger.info("Legacy top-level model loaded on startup: %s", loaded)
+    except Exception as exc:
+        STARTUP_STATE["startupWarnings"].append("LEGACY_MODEL_LOAD_FAILED")
+        logger.warning("Legacy top-level model load failed safely: %s", exc)
+    STARTUP_STATE["applicationInitialized"] = True
     yield
     # Shutdown: nothing to clean up
 
@@ -157,6 +192,7 @@ class AttributionResponse(BaseModel):
 class InternalForecastPredictionRequest(BaseModel):
     snapshotId: str
     locationKey: str
+    searchedLocationKey: Optional[str] = None
     stationLocationKey: Optional[str] = None
     stationKey: Optional[str] = None
     forecastScope: Optional[str] = None
@@ -164,12 +200,37 @@ class InternalForecastPredictionRequest(BaseModel):
     stationName: Optional[str] = None
     stationLatitude: Optional[float] = None
     stationLongitude: Optional[float] = None
-    forecastStandard: str
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+    aqiStandard: Optional[str] = None
+    provider: Optional[str] = None
+    forecastStandard: Optional[str] = None
     forecastIssueTime: Optional[str] = None
+    providerObservedAt: Optional[str] = None
     currentAqi: int
     horizons: List[int] = Field(default_factory=lambda: [24, 48, 72])
     features: dict = Field(default_factory=dict)
     history: List[dict] = Field(default_factory=list)
+    observations: List[dict] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def normalize_contract(self):
+        if not self.forecastStandard:
+            self.forecastStandard = self.aqiStandard or OPEN_METEO_AQI_STANDARD
+        if self.aqiStandard is None:
+            self.aqiStandard = self.forecastStandard
+        if self.latitude is None and self.stationLatitude is not None:
+            self.latitude = self.stationLatitude
+        if self.longitude is None and self.stationLongitude is not None:
+            self.longitude = self.stationLongitude
+        if self.observations and not self.history:
+            self.history = self.observations
+        valid_horizons = {24, 48, 72}
+        self.horizons = list(dict.fromkeys(self.horizons or [24, 48, 72]))
+        invalid = [h for h in self.horizons if h not in valid_horizons]
+        if invalid:
+            raise ValueError(f"requested horizons must be one or more of 24, 48, 72; invalid={invalid}")
+        return self
 
 
 class InternalForecastPrediction(BaseModel):
@@ -191,6 +252,17 @@ class InternalForecastPrediction(BaseModel):
     validationRmse: Optional[float] = None
     baselineRmse: Optional[float] = None
     fallbackReason: Optional[str] = None
+    promotionStatus: Optional[str] = None
+    aqiStandard: Optional[str] = None
+    stationName: Optional[str] = None
+    stationKey: Optional[str] = None
+    stationLocationKey: Optional[str] = None
+    snapshotId: Optional[str] = None
+    historyObservationCount: Optional[int] = None
+    historyCoverageHours: Optional[float] = None
+    featureCoveragePercent: Optional[float] = None
+    targetTime: Optional[str] = None
+    dataOrigin: Optional[str] = None
     trainingDeltaPercentiles: Optional[dict] = None
     oodStatus: Optional[str] = None
     oodScore: Optional[float] = None
@@ -199,6 +271,10 @@ class InternalForecastPrediction(BaseModel):
     warnings: List[str] = Field(default_factory=list)
     featureDiagnostics: Optional[dict] = None
     modelContributions: Optional[dict] = None
+    provider: Optional[str] = None
+    searchedLocationKey: Optional[str] = None
+    locationKey: Optional[str] = None
+    modelPromotionStatus: Optional[str] = None
 
 
 class InternalForecastPredictionResponse(BaseModel):
@@ -214,7 +290,99 @@ class InternalForecastPredictionResponse(BaseModel):
 # ---------------------------------------------------------------------------
 def _fallback_prediction(horizon: int, reason: str) -> dict:
     status = "SCHEMA_MISMATCH" if reason == "FEATURE_SCHEMA_MISMATCH" else "ARTIFACT_UNAVAILABLE"
-    return {"status": status, "horizonHours": horizon, "fallbackReason": reason}
+    return {
+        "status": status,
+        "horizonHours": horizon,
+        "engine": "UNAVAILABLE",
+        "fallbackReason": reason,
+        "promotionStatus": "UNAVAILABLE",
+        "dataOrigin": "UNAVAILABLE",
+    }
+
+
+def _confidence_label(confidence: float) -> str:
+    if confidence >= 0.7:
+        return "HIGH"
+    if confidence >= 0.45:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _finite_int(value) -> Optional[int]:
+    numeric = finite_number(value)
+    if numeric is None:
+        return None
+    return int(round(max(0.0, min(500.0, numeric))))
+
+
+def _forecast_prediction(
+    request: InternalForecastPredictionRequest,
+    *,
+    horizon: int,
+    generated_at: pd.Timestamp,
+    predicted_aqi,
+    lower_bound,
+    upper_bound,
+    engine: str,
+    model_family: str,
+    model_version: str,
+    confidence: float,
+    fallback_reason: Optional[str],
+    provider: str,
+    history,
+    data_origin: str,
+    station_or_location_key: str,
+) -> InternalForecastPrediction:
+    predicted = _finite_int(predicted_aqi)
+    lower = _finite_int(lower_bound) if lower_bound is not None else None
+    upper = _finite_int(upper_bound) if upper_bound is not None else None
+    status = "UNAVAILABLE" if engine == "UNAVAILABLE" else "FORECAST"
+    target_time = (generated_at + pd.Timedelta(hours=horizon)).isoformat().replace("+00:00", "Z")
+    return InternalForecastPrediction(
+        status=status,
+        horizonHours=horizon,
+        predictedAqi=predicted,
+        lowerBound=lower,
+        upperBound=upper,
+        engine=engine,
+        forecastScope=request.forecastScope or "COORDINATE_ZERO_SHOT",
+        modelScope=request.forecastScope or "GLOBAL_COORDINATE",
+        modelFamily=model_family,
+        modelVersion=model_version,
+        confidence=round(confidence, 2),
+        confidenceLabel=_confidence_label(confidence),
+        fallbackReason=fallback_reason,
+        promotionStatus="NOT_APPLICABLE",
+        modelPromotionStatus="NOT_APPLICABLE",
+        aqiStandard=request.forecastStandard,
+        stationName=request.stationName,
+        stationKey=request.stationKey or station_or_location_key,
+        stationLocationKey=request.stationLocationKey,
+        snapshotId=request.snapshotId,
+        historyObservationCount=history.observation_count,
+        historyCoverageHours=history.coverage_hours,
+        targetTime=target_time,
+        dataOrigin=data_origin,
+        provider=provider,
+        searchedLocationKey=request.searchedLocationKey or request.locationKey,
+        locationKey=request.locationKey,
+        warnings=[],
+    )
+
+
+def _nearest_provider_forecast(provider_rows: list[dict], target_time: pd.Timestamp) -> tuple[float | None, str | None]:
+    best = None
+    best_delta = None
+    for row in provider_rows or []:
+        timestamp = pd.to_datetime(row.get("timestamp"), utc=True, errors="coerce")
+        value = finite_number(row.get("currentAqi"))
+        if pd.isna(timestamp) or value is None:
+            continue
+        delta = abs((timestamp - target_time).total_seconds())
+        if best is None or delta < best_delta:
+            best = (value, timestamp.isoformat().replace("+00:00", "Z"))
+            best_delta = delta
+    return best if best is not None else (None, None)
 
 
 def _parse_issue_time(value: Optional[str]) -> pd.Timestamp:
@@ -470,67 +638,186 @@ def health_check():
     return {"status": "ok", "service": "ai-forecasting"}
 
 
+@app.get("/ready")
+def ready_check():
+    diagnostics = discover_registry(configured_model_dir(), load_models=False)
+    ready = STARTUP_STATE["applicationInitialized"] and STARTUP_STATE["inferenceModuleImported"]
+    return {
+        "status": "ready" if ready else "not_ready",
+        "applicationInitialized": STARTUP_STATE["applicationInitialized"],
+        "inferenceModuleImported": STARTUP_STATE["inferenceModuleImported"],
+        "chronosPackageImported": chronos_service.load() if chronos_service.enabled else False,
+        "chronosModelLoaded": chronos_service.loaded,
+        "chronosStatus": chronos_service.status(),
+        "providerClientConfigured": STARTUP_STATE["providerClientConfigured"],
+        "fallbackEnginesAvailable": ["OPEN_METEO_PROVIDER_FORECAST", "PERSISTENCE_FALLBACK", "UNAVAILABLE"],
+        "artifactDirectoryAccessible": diagnostics["artifactDirectoryAccessible"],
+        "modelRegistryAccessible": diagnostics["artifactDirectoryAccessible"],
+        "requiredPackagesImported": True,
+        "startupWarnings": sorted(set(STARTUP_STATE.get("startupWarnings", []) + diagnostics.get("startupWarnings", []))),
+    }
+
+
+@app.get("/internal/forecast/status")
+def internal_forecast_status():
+    diagnostics = discover_registry(configured_model_dir(), load_models=False)
+    chronos = chronos_service.status()
+    return {
+        "serviceStatus": "ready",
+        "modelId": chronos["modelId"],
+        "modelLoaded": chronos["modelLoaded"],
+        "device": chronos["device"],
+        "supportedHorizons": [24, 48, 72],
+        "historyRequirements": {"minimumHours": chronos["minHistoryHours"], "preferredHours": chronos["contextHours"]},
+        "providerFallbackAvailable": open_meteo_client.enabled,
+        "lastModelError": chronos["lastModelError"],
+        "loadedEngineNames": ["CHRONOS_BOLT_ZERO_SHOT", "OPEN_METEO_PROVIDER_FORECAST", "PERSISTENCE_FALLBACK", "UNAVAILABLE"],
+        "availableHorizons": [24, 48, 72],
+        "artifactDirectory": diagnostics["artifactDirectory"],
+        "registryPath": str(Path(settings.model_registry_path).resolve()) if settings.model_registry_path else diagnostics["artifactDirectory"],
+        "registryEntryCount": diagnostics["registryEntries"],
+        "promotedModelCount": diagnostics["promotedModelCount"],
+        "loadedModelCount": diagnostics["loadedModelCount"],
+        "supportedModelFamilies": diagnostics["supportedModelFamilies"],
+        "deterministicFallbackAvailable": True,
+        "startupWarnings": sorted(set(STARTUP_STATE.get("startupWarnings", []) + diagnostics.get("startupWarnings", []))),
+        "rejectedModelCount": diagnostics["rejectedModelCount"],
+        "rejections": diagnostics["rejections"][:25],
+    }
+
+
 @app.post("/internal/forecast/predict", response_model=InternalForecastPredictionResponse)
 def internal_forecast_predict(request: InternalForecastPredictionRequest):
     """
-    Internal-only promoted-model inference. The public Spring API remains the
-    external boundary. Missing/unpromoted artifacts are reported per horizon so
-    Spring can keep its persistence fallback.
+    Production live forecast path:
+    Chronos-Bolt zero-shot -> Open-Meteo provider forecast -> persistence -> unavailable.
+    Legacy promoted CPCB artifacts are intentionally not consulted here.
     """
+    generated_at = _parse_issue_time(request.forecastIssueTime or request.providerObservedAt)
+    station_or_location_key = request.stationKey or request.stationLocationKey or request.locationKey
+    provider_rows: list[dict] = []
+    provider_name = request.provider or "OPEN_METEO"
+    history_rows = list(request.history or [])
+    provider_error = None
+
+    if (not history_rows or len(history_rows) < settings.chronos_min_history_hours or request.forecastStandard == OPEN_METEO_AQI_STANDARD) and request.latitude is not None and request.longitude is not None:
+        try:
+            provider_series = open_meteo_client.fetch(
+                request.latitude,
+                request.longitude,
+                past_hours=settings.chronos_context_hours,
+                forecast_hours=max(request.horizons) + 24,
+            )
+            provider_name = provider_series.provider
+            provider_rows = provider_series.hourly_forecast
+            if not history_rows:
+                history_rows = provider_series.observations
+                request.forecastStandard = provider_series.aqi_standard
+                request.aqiStandard = provider_series.aqi_standard
+        except Exception as exc:
+            provider_error = f"OPEN_METEO_FETCH_FAILED: {type(exc).__name__}"
+
+    history = prepare_aqi_history(
+        history_rows,
+        issue_time=generated_at.to_pydatetime(),
+        aqi_standard=request.forecastStandard,
+        max_small_gap_hours=settings.live_history_small_gap_interpolation_hours,
+    )
+    chronos_predictions, chronos_reason = chronos_service.predict(history.values, request.horizons)
+
     predictions = []
-    base_features = dict(request.features or {})
-    base_features["currentAqi"] = request.currentAqi
-    issue_time = _parse_issue_time(request.forecastIssueTime)
-    provided_schema = base_features.get("featureSchemaVersion")
-    if provided_schema and provided_schema != "forecasting-feature-schema-v2":
-        return InternalForecastPredictionResponse(
-            snapshotId=request.snapshotId,
-            locationKey=request.locationKey,
-            forecastStandard=request.forecastStandard,
-            generatedAt=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            predictions=[InternalForecastPrediction(**_fallback_prediction(h, "FEATURE_SCHEMA_MISMATCH")) for h in request.horizons],
-        )
-
-    # Compute live features from history if available
-    history_df = pd.DataFrame(request.history) if request.history else pd.DataFrame()
-    eligible_scopes = _eligible_candidate_scopes(request, history_df, issue_time)
-
-    if request.history:
-        history_df = pd.DataFrame(request.history)
-        history_df["timestamp"] = pd.to_datetime(history_df["timestamp"], utc=True)
-        if "aqiStandard" not in history_df.columns:
-            history_df["aqiStandard"] = request.forecastStandard
-        else:
-            history_df["aqiStandard"] = history_df["aqiStandard"].fillna(request.forecastStandard)
-        
-        # Add current observation
-        model_scope_key = request.stationKey or request.stationLocationKey or request.locationKey
-        current_obs = {
-            "timestamp": issue_time,
-            "locationKey": model_scope_key,
-            "currentAqi": request.currentAqi,
-            "aqiStandard": request.forecastStandard,
-        }
-        for k in ["pm25", "pm10", "no2", "so2", "co", "o3", "nh3"]:
-            if k in base_features and base_features[k] is not None:
-                current_obs[k] = base_features[k]
-
-        combined = pd.concat([history_df, pd.DataFrame([current_obs])], ignore_index=True)
-        bundle = build_hourly_dataset(combined)
-        if not bundle.frame.empty:
-            latest_features = bundle.frame.iloc[-1].to_dict()
-            for k, v in latest_features.items():
-                if pd.notna(v) and k not in ["timestamp", "locationKey"]:
-                    base_features[k] = v
-    else:
-        model_scope_key = request.stationKey or request.stationLocationKey or request.locationKey
-
     for horizon in request.horizons:
-        result = promoted_forecast_predict(settings.ml_model_dir, request.forecastStandard, horizon, base_features, model_scope_key, eligible_scopes)
-        predictions.append(InternalForecastPrediction(**result))
+        target_time = generated_at + pd.Timedelta(hours=horizon)
+        chronos = chronos_predictions.get(horizon)
+        if chronos is not None:
+            predictions.append(_forecast_prediction(
+                request,
+                horizon=horizon,
+                generated_at=generated_at,
+                predicted_aqi=chronos.predicted_aqi,
+                lower_bound=chronos.lower_bound,
+                upper_bound=chronos.upper_bound,
+                engine="CHRONOS_BOLT_ZERO_SHOT",
+                model_family="CHRONOS_BOLT",
+                model_version=chronos_service.model_id,
+                confidence=max(0.45, 0.78 - (horizon / 24 - 1) * 0.08),
+                fallback_reason=None,
+                provider=provider_name,
+                history=history,
+                data_origin="PRETRAINED_ZERO_SHOT_MODEL",
+                station_or_location_key=station_or_location_key,
+            ))
+            continue
+
+        provider_value, provider_timestamp = _nearest_provider_forecast(provider_rows, target_time)
+        if provider_value is not None and request.forecastStandard == OPEN_METEO_AQI_STANDARD:
+            predictions.append(_forecast_prediction(
+                request,
+                horizon=horizon,
+                generated_at=generated_at,
+                predicted_aqi=provider_value,
+                lower_bound=max(0.0, provider_value - 18.0),
+                upper_bound=min(500.0, provider_value + 18.0),
+                engine="OPEN_METEO_PROVIDER_FORECAST",
+                model_family="PROVIDER_NUMERICAL_FORECAST",
+                model_version="open-meteo-air-quality",
+                confidence=max(0.35, 0.62 - (horizon / 24 - 1) * 0.07),
+                fallback_reason=chronos_reason or "CHRONOS_UNAVAILABLE",
+                provider=provider_name,
+                history=history,
+                data_origin=f"OPEN_METEO_PROVIDER_FORECAST:{provider_timestamp}",
+                station_or_location_key=station_or_location_key,
+            ))
+            continue
+
+        current_aqi = _finite_int(request.currentAqi)
+        if current_aqi is not None and current_aqi > 0:
+            reason_parts = [chronos_reason or "CHRONOS_UNAVAILABLE"]
+            if provider_error:
+                reason_parts.append(provider_error)
+            elif request.forecastStandard != OPEN_METEO_AQI_STANDARD:
+                reason_parts.append("PROVIDER_FORECAST_STANDARD_MISMATCH")
+            else:
+                reason_parts.append("PROVIDER_FORECAST_UNAVAILABLE")
+            predictions.append(_forecast_prediction(
+                request,
+                horizon=horizon,
+                generated_at=generated_at,
+                predicted_aqi=current_aqi,
+                lower_bound=max(0, current_aqi - 25),
+                upper_bound=min(500, current_aqi + 25),
+                engine="PERSISTENCE_FALLBACK",
+                model_family="PERSISTENCE_BASELINE",
+                model_version="persistence-v1",
+                confidence=0.28,
+                fallback_reason=";".join(reason_parts),
+                provider=provider_name,
+                history=history,
+                data_origin="PERSISTENCE_BASELINE",
+                station_or_location_key=station_or_location_key,
+            ))
+            continue
+
+        predictions.append(_forecast_prediction(
+            request,
+            horizon=horizon,
+            generated_at=generated_at,
+            predicted_aqi=None,
+            lower_bound=None,
+            upper_bound=None,
+            engine="UNAVAILABLE",
+            model_family="UNAVAILABLE",
+            model_version="unavailable",
+            confidence=0.0,
+            fallback_reason="CURRENT_AQI_UNAVAILABLE;" + (provider_error or chronos_reason or "FORECAST_UNAVAILABLE"),
+            provider=provider_name,
+            history=history,
+            data_origin="UNAVAILABLE",
+            station_or_location_key=station_or_location_key,
+        ))
     return InternalForecastPredictionResponse(
         snapshotId=request.snapshotId,
-        locationKey=request.locationKey,
+        locationKey=request.searchedLocationKey or request.locationKey,
         forecastStandard=request.forecastStandard,
         generatedAt=datetime.utcnow().isoformat() + "Z",
         predictions=predictions,

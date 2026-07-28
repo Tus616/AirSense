@@ -227,12 +227,12 @@ function actionDetailText(item) {
 }
 
 function engineLabel(point, forecastResult) {
-  const mode = point?.mode || forecastResult?.mode || point?.engine || point?.modelFamily || "UNAVAILABLE";
+  const mode = point?.engine || point?.mode || forecastResult?.engine || forecastResult?.mode || point?.modelFamily || "UNAVAILABLE";
   if (mode.startsWith("ML_") || point?.modelPromotionStatus === "PROMOTED" || point?.promotionStatus === "PROMOTED") {
-    return "Promoted ML";
+    return "Validated ML Model";
   }
-  if (mode === "TREND_WEATHER_V1") return "Trend and weather";
-  if (mode === "PERSISTENCE" || mode === "PERSISTENCE_FALLBACK") return "Persistence";
+  if (mode === "TREND_WEATHER_V1") return "Trend + Weather";
+  if (mode === "PERSISTENCE" || mode === "PERSISTENCE_FALLBACK") return "Persistence Fallback";
   if (mode === "UNAVAILABLE" || point?.predictedAqi == null) return "Unavailable";
   return labelize(mode);
 }
@@ -1338,7 +1338,7 @@ function LiveForecastCard({ forecastResult, compact = false }) {
       <PanelHeader
         eyebrow="Live Forecast"
         title="24h / 48h / 72h outlook"
-        chip={labelize(forecastResult?.mode || forecastResult?.modelVersion, "Forecast unavailable")}
+        chip={engineLabel({ engine: forecastResult?.engine || forecastResult?.mode, modelVersion: forecastResult?.modelVersion }, forecastResult)}
       />
       <p className="uqi-note">
         Station forecast only: {toDisplayText(forecastResult?.stationName || points.find((point) => point.stationName)?.stationName, "Unknown station")}.
@@ -1346,7 +1346,7 @@ function LiveForecastCard({ forecastResult, compact = false }) {
       </p>
       {!compact && fallbackPoints.length > 0 && (
         <div className="uqi-warning-banner" role="status">
-          <strong>Persistence fallback active because live history is insufficient.</strong>
+          <strong>Fallback or degraded forecast active.</strong>
           <span>{fallbackPoints.length} horizon{fallbackPoints.length === 1 ? "" : "s"} include fallback or degraded-history diagnostics.</span>
         </div>
       )}

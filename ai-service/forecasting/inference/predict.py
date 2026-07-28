@@ -8,13 +8,108 @@ import numpy as np
 import pandas as pd
 
 
+IGNORED_METADATA_FILES = {"training_report.json", "dataset_quality.json", "scheduled_retraining_quality.json"}
+
+
+def resolve_model_dir(model_dir: str | Path) -> Path:
+    path = Path(model_dir)
+    if path.is_absolute():
+        return path
+    return Path(__file__).resolve().parents[2] / path
+
+
+def resolve_artifact_path(model_dir: str | Path, artifact_path: str | Path) -> Path:
+    model_dir = resolve_model_dir(model_dir)
+    raw = str(artifact_path).replace("\\", "/")
+    path = Path(raw)
+    if path.is_absolute():
+        return path
+    if path.parts and path.parts[0] == model_dir.name:
+        return model_dir.parent / path
+    return model_dir / path
+
+
+def discover_registry(model_dir: str | Path, load_models: bool = False) -> dict:
+    model_dir = resolve_model_dir(model_dir)
+    diagnostics = {
+        "artifactDirectory": str(model_dir),
+        "artifactDirectoryAccessible": model_dir.exists() and model_dir.is_dir(),
+        "registryEntries": 0,
+        "promotedModelCount": 0,
+        "loadedModelCount": 0,
+        "rejectedModelCount": 0,
+        "availableHorizons": [],
+        "supportedModelFamilies": [],
+        "startupWarnings": [],
+        "rejections": [],
+    }
+    if not diagnostics["artifactDirectoryAccessible"]:
+        diagnostics["startupWarnings"].append("MODEL_DIR_UNAVAILABLE")
+        return diagnostics
+
+    horizons = set()
+    families = set()
+    for metadata_path in sorted(model_dir.glob("*.json")):
+        if metadata_path.name in IGNORED_METADATA_FILES:
+            continue
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            diagnostics["registryEntries"] += 1
+            horizon = metadata.get("horizonHours")
+            if horizon is not None:
+                horizons.add(int(horizon))
+            if metadata.get("modelFamily"):
+                families.add(str(metadata["modelFamily"]))
+            if metadata.get("promotionStatus") != "PROMOTED":
+                diagnostics["rejectedModelCount"] += 1
+                diagnostics["rejections"].append({
+                    "modelId": metadata.get("modelId") or metadata_path.stem,
+                    "reason": metadata.get("promotionStatus") or "MODEL_NOT_PROMOTED",
+                })
+                continue
+            diagnostics["promotedModelCount"] += 1
+            artifact_path = resolve_artifact_path(model_dir, metadata.get("artifactPath", ""))
+            if not artifact_path.exists():
+                diagnostics["rejectedModelCount"] += 1
+                diagnostics["rejections"].append({
+                    "modelId": metadata.get("modelId") or metadata_path.stem,
+                    "reason": "ARTIFACT_UNAVAILABLE",
+                    "artifactPath": str(artifact_path),
+                })
+                continue
+            if load_models:
+                try:
+                    joblib.load(artifact_path)
+                    diagnostics["loadedModelCount"] += 1
+                except Exception as exc:
+                    diagnostics["rejectedModelCount"] += 1
+                    diagnostics["rejections"].append({
+                        "modelId": metadata.get("modelId") or metadata_path.stem,
+                        "reason": "MODEL_LOAD_FAILED",
+                        "detail": str(exc),
+                    })
+        except Exception as exc:
+            diagnostics["rejectedModelCount"] += 1
+            diagnostics["rejections"].append({
+                "modelId": metadata_path.stem,
+                "reason": "REGISTRY_ENTRY_INVALID",
+                "detail": str(exc),
+            })
+    diagnostics["availableHorizons"] = sorted(horizons)
+    diagnostics["supportedModelFamilies"] = sorted(families)
+    return diagnostics
+
+
 def load_promoted(model_dir: str | Path, standard: str, horizon: int, location_key: str = None, candidate_scopes: list[str] | None = None):
-    model_dir = Path(model_dir)
+    model_dir = resolve_model_dir(model_dir)
     matches = []
     for metadata_path in sorted(model_dir.glob("*.json")):
-        if metadata_path.name in {"training_report.json", "dataset_quality.json"}:
+        if metadata_path.name in IGNORED_METADATA_FILES:
             continue
-        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
         
         # Check standard, horizon, and promotion status
         if (
@@ -32,17 +127,12 @@ def load_promoted(model_dir: str | Path, standard: str, horizon: int, location_k
         scoped = [metadata for metadata in matches if metadata.get("modelScope") == scope]
         if scoped:
             metadata = sorted(scoped, key=lambda item: item.get("promotedAt") or "", reverse=True)[0]
-            raw_artifact_path = str(metadata["artifactPath"]).replace("\\", "/")
-            artifact_path = Path(raw_artifact_path)
-
-            if not artifact_path.is_absolute():
-                if artifact_path.parts and artifact_path.parts[0] == model_dir.name:
-                    artifact_path = model_dir.parent / artifact_path
-                else:
-                    artifact_path = model_dir / artifact_path
-
-            artifact = joblib.load(artifact_path)
-            return artifact["pipeline"], metadata
+            try:
+                artifact_path = resolve_artifact_path(model_dir, metadata["artifactPath"])
+                artifact = joblib.load(artifact_path)
+                return artifact["pipeline"], metadata
+            except Exception:
+                continue
     return None, None
 
 
@@ -125,7 +215,7 @@ def predict(model_dir: str | Path, standard: str, horizon: int, features: dict, 
         }
     scope = metadata.get("modelScope") or "GLOBAL"
     scope_label = "STATION_SPECIFIC_ML" if location_key and scope == location_key else "MULTI_STATION_GLOBAL_ML"
-    engine_label = _engine_label(metadata.get("modelFamily", ""), scope_label)
+    engine_label = "ML_PROMOTED"
     model_confidence = adjusted_confidence(confidence(metadata, features), ood_level)
     return {
         "status": "PROMOTED",

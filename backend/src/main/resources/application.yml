@@ -126,7 +126,7 @@ forecast:
     metrics-min-samples: ${FORECAST_METRICS_MIN_SAMPLES:10}
     metrics-preferred-samples: ${FORECAST_METRICS_PREFERRED_SAMPLES:30}
   ml:
-    enabled: ${ML_FORECAST_ENABLED:false}
+    enabled: ${ML_FORECAST_ENABLED:true}
     service-url: ${ML_FORECAST_SERVICE_URL:${AI_SERVICE_BASE_URL:http://localhost:8000}}
     timeout-seconds: ${ML_FORECAST_TIMEOUT_SECONDS:5}
     model-scope: ${ML_FORECAST_MODEL_SCOPE:GLOBAL}
@@ -134,12 +134,12 @@ forecast:
     min-rmse-improvement-percent: ${ML_MODEL_PROMOTION_MIN_RMSE_IMPROVEMENT_PERCENT:5}
     max-absolute-bias: ${ML_MODEL_MAX_ABSOLUTE_BIAS:20}
   retraining:
-    enabled: ${FORECAST_RETRAINING_ENABLED:true}
+    enabled: ${FORECAST_RETRAINING_ENABLED:false}
     daily-quality-cron: ${FORECAST_RETRAINING_DAILY_QUALITY_CRON:0 15 1 * * *}
     training-cron: ${FORECAST_RETRAINING_CRON:0 30 2 ? * SUN}
     schedule: ${FORECAST_RETRAINING_SCHEDULE:weekly}
-    ai-service-directory: ${FORECAST_RETRAINING_AI_SERVICE_DIR:../ai-service}
-    python-executable: ${FORECAST_RETRAINING_PYTHON:../ai-service/venv/Scripts/python.exe}
+    ai-service-directory: ${FORECAST_RETRAINING_AI_SERVICE_DIR:}
+    python-executable: ${FORECAST_RETRAINING_PYTHON:python}
     model-dir: ${FORECAST_RETRAINING_MODEL_DIR:models}
     aqi-standard: ${FORECAST_RETRAINING_AQI_STANDARD:INDIA_NAQI}
     scopes: ${FORECAST_RETRAINING_SCOPES:GLOBAL_COLD_START,GLOBAL_SHORT_HISTORY,GLOBAL_MEDIUM_HISTORY,GLOBAL_FULL_HISTORY}

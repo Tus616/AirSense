@@ -37,8 +37,9 @@ public class MlForecastClient {
                 .readTimeout(Duration.ofSeconds(properties.getTimeoutSeconds()))
                 .build();
         try {
+            String serviceUrl = normalizeServiceUrl(properties.getServiceUrl());
             ResponseEntity<MlForecastResponse> response = restTemplate.postForEntity(
-                    properties.getServiceUrl() + "/internal/forecast/predict",
+                    serviceUrl + "/internal/forecast/predict",
                     request,
                     MlForecastResponse.class
             );
@@ -50,6 +51,14 @@ public class MlForecastClient {
         }
     }
 
+    private String normalizeServiceUrl(String serviceUrl) {
+        String resolved = serviceUrl == null ? "" : serviceUrl.trim();
+        while (resolved.endsWith("/")) {
+            resolved = resolved.substring(0, resolved.length() - 1);
+        }
+        return resolved;
+    }
+
     @Data
     @Builder
     
@@ -58,6 +67,7 @@ public class MlForecastClient {
     public static class MlForecastRequest {
         private String snapshotId;
         private String locationKey;
+        private String searchedLocationKey;
         private String stationLocationKey;
         private String stationKey;
         private String forecastScope;
@@ -67,6 +77,12 @@ public class MlForecastClient {
         private Double stationLatitude;
         private Double stationLongitude;
         private String forecastStandard;
+        private String aqiStandard;
+        private String provider;
+        private Double latitude;
+        private Double longitude;
+        private String forecastIssueTime;
+        private String providerObservedAt;
         private Integer currentAqi;
         @Builder.Default
         private List<Integer> horizons = List.of(24, 48, 72);
@@ -109,6 +125,14 @@ public class MlForecastClient {
         private Double validationRmse;
         private Double baselineRmse;
         private String fallbackReason;
+        private String provider;
+        private String dataOrigin;
+        private String searchedLocationKey;
+        private String locationKey;
+        private String aqiStandard;
+        private String stationKey;
+        private String stationLocationKey;
+        private String modelPromotionStatus;
         private Map<String, Object> trainingDeltaPercentiles;
         private String oodStatus;
         private Double oodScore;

@@ -28,7 +28,9 @@ public class AqiForecastRun {
     private String snapshotId;
     private String stationKey;
     private String stationLocationKey;
+    private String searchedLocationKey;
     private Instant generatedAt;
+    private Instant providerObservedAt;
     private Instant targetTime;
     private Integer horizonHours;
     private Integer predictedAqi;
@@ -38,6 +40,9 @@ public class AqiForecastRun {
     private String engine;
     private String modelVersion;
     private Integer baselinePredictedAqi;
+    private String fallbackReason;
+    private Double confidence;
+    private String forecastScope;
     private Integer actualAqi;
     private Instant actualObservedAt;
     private Double error;
