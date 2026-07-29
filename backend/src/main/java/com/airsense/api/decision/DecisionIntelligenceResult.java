@@ -49,5 +49,7 @@ public class DecisionIntelligenceResult {
     private ExplainabilitySummary explainabilitySummary;
     private String explainabilityEndpoint;
     @Builder.Default
+    private Map<String, ModuleStatus> moduleStatuses = new HashMap<>();
+    @Builder.Default
     private Map<String, Object> environmentalSignals = new HashMap<>();
 }

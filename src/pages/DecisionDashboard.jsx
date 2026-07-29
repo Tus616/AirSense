@@ -34,6 +34,8 @@ import {
   getAqiTone,
   getForecastPoints,
   labelize,
+  moduleStatusLabel,
+  moduleStatusReason,
   toDisplayText,
 } from "../components/decision/decisionUtils";
 
@@ -161,6 +163,10 @@ function fallbackReasonLabel(reason) {
     .filter(Boolean)
     .map((part) => labels[part] || labelize(part, "No fallback reason reported"))
     .join(" / ");
+}
+
+function statusFor(decision, key) {
+  return decision?.moduleStatuses?.[key] || null;
 }
 
 function hasFallbackDiagnostics(point) {
@@ -771,7 +777,7 @@ function OverviewPage({ context }) {
       <section className="uqi-overview-command-grid">
         <CurrentAqiCard decision={decision} />
         <CitySummaryCard decision={decision} />
-        <LiveForecastCard forecastResult={decision?.forecast} compact />
+        <LiveForecastCard forecastResult={decision?.forecast} moduleStatus={statusFor(decision, "forecast")} compact />
       </section>
 
       <section className="uqi-command-row uqi-command-row--insights">
@@ -841,7 +847,7 @@ function ForecastPage({ context }) {
         title="Live forecast and historical replay"
         note="Live forecasts remain separate from replay state. Unavailable values are shown as unavailable, never as zero."
       />
-      <LiveForecastCard forecastResult={context.decision?.forecast} />
+      <LiveForecastCard forecastResult={context.decision?.forecast} moduleStatus={statusFor(context.decision, "forecast")} />
       <HistoricalReplayCard expanded />
       <section className="uqi-panel">
         <PanelHeader eyebrow="Model Details" title="Horizon diagnostics" chip={`${points.length} horizons`} />
@@ -1193,6 +1199,7 @@ function SettingsPage({ context }) {
 
 function CurrentAqiCard({ decision }) {
   const signals = decision?.environmentalSignals || {};
+  const moduleStatus = statusFor(decision, "currentAqi");
   const currentAqi = decision?.currentAQI ?? signals.currentAqi ?? signals.aqi;
   const hasCurrentAqi = Number.isFinite(Number(currentAqi));
   const tone = getAqiTone(currentAqi);
@@ -1207,7 +1214,7 @@ function CurrentAqiCard({ decision }) {
   const gaugeValue = Math.max(0, Math.min(100, (Number(currentAqi) || 0) / 500 * 100));
   return (
     <MotionCard className={`uqi-panel uqi-panel--aqi uqi-aqi-hero tone-${tone}`}>
-      <PanelHeader eyebrow="Current AQI" title={stationNameFromDecision(decision)} chip={labelize(category, "Category unavailable")} />
+      <PanelHeader eyebrow="Current AQI" title={stationNameFromDecision(decision)} chip={labelize(category, moduleStatusLabel(moduleStatus, "Category unavailable"))} />
       <div className="uqi-aqi-hero__body">
         <div className={`uqi-aqi-gauge ${hasCurrentAqi ? "" : "is-unavailable"}`} style={{ "--gauge": gaugeValue }}>
           <svg viewBox="0 0 120 120" aria-hidden="true">
@@ -1248,6 +1255,8 @@ function CurrentAqiCard({ decision }) {
           <div><dt>Standard</dt><dd>{labelize(signals.aqiStandard || decision?.forecast?.forecastStandard, "Unavailable")}</dd></div>
           <div><dt>Snapshot ID</dt><dd>{toDisplayText(decision?.snapshotId)}</dd></div>
           <div><dt>Location hash</dt><dd>{toDisplayText(decision?.locationHash)}</dd></div>
+          <div><dt>Status</dt><dd>{moduleStatusLabel(moduleStatus)}</dd></div>
+          <div><dt>Reason</dt><dd>{moduleStatusReason(moduleStatus)}</dd></div>
         </dl>
       </details>
     </MotionCard>
@@ -1257,6 +1266,7 @@ function CurrentAqiCard({ decision }) {
 function CitySummaryCard({ decision }) {
   const summary = decision?.environmentalSignals?.citySummary || decision?.citySummary || {};
   const hasSummary = Object.keys(summary || {}).length > 0;
+  const status = hasSummary ? "Derived from fresh same-standard city stations" : moduleStatusReason(statusFor(decision, "currentAqi"), "Fresh same-standard station coverage is insufficient.");
   const items = [
     ["Avg AQI", summary.medianAqi ?? summary.medianAQI],
     ["Stations", summary.freshStationCount ?? summary.stationCount],
@@ -1280,7 +1290,7 @@ function CitySummaryCard({ decision }) {
       <p className="uqi-note">
         {hasSummary
           ? toDisplayText(summary.explanation || summary.overview, "City summary is based on available fresh same-standard stations.")
-          : "Insufficient fresh same-standard stations for city summary."}
+          : status}
       </p>
     </MotionCard>
   );
@@ -1304,18 +1314,20 @@ function RiskDecisionCard({ decision, activeFrame }) {
 
 function EnforcementSummaryCard({ decision }) {
   const enforcement = decision?.enforcement || {};
+  const moduleStatus = statusFor(decision, "enforcement");
   const priorityActions = asArray(decision?.priorityActions);
   const actions = asArray(enforcement.actions || enforcement.recommendedActions || enforcement.recommendations);
   const agencies = asArray(enforcement.agencies || enforcement.responsibleAgencies);
   const items = (actions.length > 0 ? actions : priorityActions).slice(0, 3);
   return (
     <MotionCard className="uqi-panel uqi-enforcement-summary-card">
-      <PanelHeader eyebrow="Enforcement Summary" title={labelize(enforcement.priority || enforcement.severity, "Action queue")} chip={`${items.length} items`} />
+      <PanelHeader eyebrow="Enforcement Summary" title={labelize(enforcement.priority || enforcement.severity, "Action queue")} chip={items.length ? `${items.length} items` : moduleStatusLabel(moduleStatus, "Limited status")} />
       <div className="uqi-status-rows">
         <span><i className="tone-medium" /><b>Actions</b><strong>{items.length || "Unavailable"}</strong></span>
         <span><i className="tone-low" /><b>Agencies</b><strong>{agencies.length || "Unavailable"}</strong></span>
-        <span><i className="tone-neutral" /><b>Confidence</b><strong>{confidenceText(enforcement.confidence)}</strong></span>
+        <span><i className="tone-neutral" /><b>Confidence</b><strong>{confidenceText(enforcement.confidence ?? moduleStatus?.confidence)}</strong></span>
       </div>
+      {!items.length && <p className="uqi-note">{moduleStatusReason(moduleStatus, "No enforcement actions were returned.")}</p>}
       <ActionList items={items} empty="No enforcement actions were returned." compact />
       <Link className="uqi-inline-action" to="/gov/enforcement">Open enforcement</Link>
     </MotionCard>
@@ -1346,7 +1358,7 @@ function CollectorModelStatusCard({ decision, timeline }) {
   );
 }
 
-function LiveForecastCard({ forecastResult, compact = false }) {
+function LiveForecastCard({ forecastResult, moduleStatus, compact = false }) {
   const points = getForecastPoints(forecastResult);
   const fallbackPoints = points.filter(hasFallbackDiagnostics);
   return (
@@ -1354,11 +1366,12 @@ function LiveForecastCard({ forecastResult, compact = false }) {
       <PanelHeader
         eyebrow="Live Forecast"
         title="24h / 48h / 72h outlook"
-        chip={engineLabel({ engine: forecastResult?.engine || forecastResult?.mode, modelVersion: forecastResult?.modelVersion }, forecastResult)}
+        chip={moduleStatusLabel(moduleStatus, engineLabel({ engine: forecastResult?.engine || forecastResult?.mode, modelVersion: forecastResult?.modelVersion }, forecastResult))}
       />
       <p className="uqi-note">
         Station forecast only: {toDisplayText(forecastResult?.stationName || points.find((point) => point.stationName)?.stationName, "Unknown station")}.
         {!compact && <> Current provider {labelize(forecastResult?.currentProvider, "unavailable")}; forecast standard {labelize(forecastResult?.forecastStandard, "unavailable")}.</>}
+        {!compact && moduleStatus ? <> {moduleStatusReason(moduleStatus)}</> : null}
       </p>
       {!compact && fallbackPoints.length > 0 && (
         <div className="uqi-warning-banner" role="status">

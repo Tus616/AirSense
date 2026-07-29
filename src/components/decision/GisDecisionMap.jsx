@@ -296,6 +296,17 @@ function featureCollection(layer) {
 
 function pointToLayer(layer, feature, latlng) {
   const props = feature?.properties || {};
+  const radiusMeters = Number(props.radiusMeters);
+  if (Number.isFinite(radiusMeters) && radiusMeters > 0) {
+    return L.circle(latlng, {
+      radius: radiusMeters,
+      color: colorFor(layer, props),
+      opacity: 0.9,
+      weight: 2,
+      fillColor: colorFor(layer, props),
+      fillOpacity: 0.22,
+    });
+  }
   return L.circleMarker(latlng, {
     radius: Math.max(6, Math.min(18, Math.round(pointRadius(layer, props) / 45))),
     color: "#ffffff",
@@ -320,8 +331,8 @@ function featureStyle(layer, feature) {
 function layerTooltip(layer) {
   return [
     labelize(layer?.displayName || layer?.layerType, "Layer"),
-    toDisplayText(layer?.dataOrigin, ""),
-    toDisplayText(layer?.evidenceSummary, ""),
+    toDisplayText(layer?.metadata?.dataOrigin || layer?.dataOrigin, ""),
+    toDisplayText(layer?.metadata?.note || layer?.evidenceSummary, ""),
   ].filter(Boolean).join(" | ");
 }
 

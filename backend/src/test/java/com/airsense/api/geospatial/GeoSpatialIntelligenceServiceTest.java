@@ -47,7 +47,8 @@ class GeoSpatialIntelligenceServiceTest {
         GeoSpatialIntelligenceResult result = service().assemble(context(false), attribution(), forecast(), enforcement(), advisory(), decision());
 
         assertThat(result.getLayers()).allSatisfy(layer -> assertThat(layer.getMetadata().get("dataOrigin"))
-                .isIn("OBSERVED", "DERIVED_FROM_REAL_DATA", "FORECAST", "UNAVAILABLE"));
+                .isIn("OBSERVED_REAL_DATA", "DERIVED_FROM_REAL_DATA", "OPEN_METEO_PROVIDER_FORECAST",
+                        "TRAINED_MODEL", "PROVIDER_FORECAST", "PERSISTENCE_FALLBACK", "UNAVAILABLE"));
     }
 
     @Test
@@ -78,6 +79,37 @@ class GeoSpatialIntelligenceServiceTest {
         assertThat(layer(result, GeoSpatialLayerType.FORECAST_GRID_24H).getDisplayName()).contains("24h");
         assertThat(layer(result, GeoSpatialLayerType.FORECAST_GRID_48H).getDisplayName()).contains("48h");
         assertThat(layer(result, GeoSpatialLayerType.FORECAST_GRID_72H).getDisplayName()).contains("72h");
+    }
+
+    @Test
+    void missingExactHotspotGeometryReturnsDerivedCircleFromRealAqiAndCoordinates() {
+        GeoSpatialIntelligenceResult result = service().assemble(context(false), attribution(), forecast(), enforcement(), advisory(), decision());
+
+        GeoSpatialLayer hotspots = layer(result, GeoSpatialLayerType.AQI_HOTSPOTS);
+        List<?> features = (List<?>) hotspots.getGeoJson().get("features");
+        assertThat(features).hasSize(1);
+        Map<?, ?> feature = (Map<?, ?>) features.get(0);
+        Map<?, ?> geometry = (Map<?, ?>) feature.get("geometry");
+        Map<?, ?> properties = (Map<?, ?>) feature.get("properties");
+        assertThat(geometry.get("type")).isEqualTo("Point");
+        assertThat(properties.get("featureKind")).isEqualTo("CIRCLE");
+        assertThat(properties.get("radiusMeters")).isInstanceOf(Number.class);
+        assertThat(hotspots.getMetadata()).containsEntry("geometrySource", "selected_location_circle");
+        assertThat(hotspots.getMetadata()).containsEntry("dataOrigin", "DERIVED_FROM_REAL_DATA");
+    }
+
+    @Test
+    void forecastLayersReturnDerivedCirclesWhenForecastPointsExist() {
+        GeoSpatialIntelligenceResult result = service().assemble(context(false), attribution(), forecast(), enforcement(), advisory(), decision());
+
+        GeoSpatialLayer forecast24 = layer(result, GeoSpatialLayerType.FORECAST_GRID_24H);
+        List<?> features = (List<?>) forecast24.getGeoJson().get("features");
+        assertThat(features).hasSize(1);
+        Map<?, ?> feature = (Map<?, ?>) features.get(0);
+        Map<?, ?> properties = (Map<?, ?>) feature.get("properties");
+        assertThat(properties.get("featureKind")).isEqualTo("CIRCLE");
+        assertThat(properties.get("predictedAqi")).isEqualTo(280);
+        assertThat(forecast24.getMetadata()).containsEntry("geometrySource", "selected_location_circle");
     }
 
     @Test

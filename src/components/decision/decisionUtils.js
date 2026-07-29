@@ -71,6 +71,18 @@ export function labelize(value, fallback = "Unknown") {
   return toDisplayText(value, fallback).replace(/_/g, " ");
 }
 
+export function moduleStatusLabel(status, fallback = "Status unavailable") {
+  if (!status || typeof status !== "object") return fallback;
+  const state = labelize(status.status, "");
+  const origin = labelize(status.dataOrigin, "");
+  if (state && origin) return `${state} - ${origin}`;
+  return state || origin || fallback;
+}
+
+export function moduleStatusReason(status, fallback = "No status reason returned.") {
+  return toDisplayText(status?.reason, fallback);
+}
+
 export function getCityOption(cityId) {
   return null;
 }

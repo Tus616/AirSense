@@ -88,14 +88,20 @@ public class DecisionIntelligenceService {
         EngineStatus status = engineStatus(safeContext, safeAttribution, safeForecast, safeEnforcement, safeAdvisories, safeFailures);
         DecisionSummary summary = summary(safeContext, safeAttribution, safeForecast, safeEnforcement, safeAdvisories, canonicalCurrentAqi, currentAqi, forecastPeak, source, priorityActions);
         double confidence = overallConfidence(evidence, status);
+        Instant generatedAt = Instant.now();
+        String snapshotId = snapshotId(safeContext, safeAttribution);
+        Map<String, Object> signals = environmentalSignals(safeContext);
+        Map<String, ModuleStatus> moduleStatuses = moduleStatuses(safeContext, safeAttribution, safeForecast,
+                safeEnforcement, safeAdvisories, status, safeFailures, canonicalCurrentAqi, forecastPeak, confidence,
+                snapshotId, generatedAt, signals);
 
         log.info("DecisionIntelligence Success cityId={} degraded={} currentAqi={} forecastPeak={}",
                 valueOrDefault(safeContext.getCityId(), safeRequest.getCityId()), status.isDegradedMode(), currentAqi, forecastPeak);
         return DecisionIntelligenceResult.builder()
                 .city(valueOrDefault(safeContext.getCity(), safeRequest.getCityId()))
                 .cityId(valueOrDefault(safeContext.getCityId(), safeRequest.getCityId()))
-                .generatedAt(Instant.now())
-                .snapshotId(snapshotId(safeContext, safeAttribution))
+                .generatedAt(generatedAt)
+                .snapshotId(snapshotId)
                 .sharedSnapshot(sharedSnapshot(safeContext, safeForecast, safeAttribution, safeRequest))
                 .locationKey(safeAttribution.getLocationKey())
                 .snapshotObservedAt(safeAttribution.getSnapshotObservedAt())
@@ -129,7 +135,8 @@ public class DecisionIntelligenceService {
                         .degradedMode(status.isDegradedMode())
                         .build())
                 .explainabilityEndpoint("/api/v1/intelligence/explainability?cityId=" + valueOrDefault(safeContext.getCityId(), safeRequest.getCityId()))
-                .environmentalSignals(environmentalSignals(safeContext))
+                .moduleStatuses(moduleStatuses)
+                .environmentalSignals(signals)
                 .build();
     }
 
@@ -484,6 +491,129 @@ public class DecisionIntelligenceService {
         signals.put("citySummary", aqi.getOrDefault("citySummary", Map.of()));
         signals.put("sourceScope", valueOrDefault(String.valueOf(aqi.getOrDefault("sourceScope", "")), ""));
         return signals;
+    }
+
+    private Map<String, ModuleStatus> moduleStatuses(CityEnvironmentalContext context, AttributionResult attribution,
+                                                     ForecastResult forecast, EnforcementResult enforcement,
+                                                     HealthAdvisoryResult advisories, EngineStatus engineStatus,
+                                                     Map<String, String> failures, Integer currentAqi,
+                                                     Integer forecastPeak, double overallConfidence,
+                                                     String snapshotId, Instant generatedAt,
+                                                     Map<String, Object> signals) {
+        Map<String, ModuleStatus> statuses = new LinkedHashMap<>();
+        statuses.put("currentAqi", status(
+                currentAqi != null && currentAqi > 0 ? "AVAILABLE" : "UNAVAILABLE",
+                currentAqi != null && currentAqi > 0 ? "OBSERVED_REAL_DATA" : "UNAVAILABLE",
+                providerConfidence(context, "aqi", currentAqi != null && currentAqi > 0 ? 0.65 : 0.0),
+                currentAqi != null && currentAqi > 0 ? "Canonical AQI selected from provider/fusion context." : valueOrDefault(text(signals.get("unavailableReason")), "No valid provider AQI was returned for this snapshot."),
+                currentAqi != null && currentAqi > 0 ? List.of() : List.of("AQI may remain unavailable until CPCB/IQAir/OpenWeather returns a valid observation."),
+                currentAqi != null && currentAqi > 0 ? List.of() : List.of("currentAqi"),
+                snapshotId, generatedAt));
+        boolean pollutantsAvailable = hasPollutants(signals.get("pollutants"));
+        statuses.put("pollutants", status(
+                pollutantsAvailable ? "AVAILABLE" : currentAqi != null && currentAqi > 0 ? "DERIVED" : "UNAVAILABLE",
+                pollutantsAvailable ? "OBSERVED_REAL_DATA" : currentAqi != null && currentAqi > 0 ? "DERIVED_FROM_REAL_DATA" : "UNAVAILABLE",
+                pollutantsAvailable ? providerConfidence(context, "aqi", 0.62) : currentAqi != null && currentAqi > 0 ? 0.35 : 0.0,
+                pollutantsAvailable ? "Pollutant rows or selected-station pollutant values are present." : currentAqi != null && currentAqi > 0 ? "Only aggregate AQI is available; pollutant display is limited to AQI-derived context." : "No pollutant measurements were returned.",
+                pollutantsAvailable ? List.of() : List.of("Pollutant-specific concentrations are not inferred without provider evidence."),
+                pollutantsAvailable || currentAqi != null && currentAqi > 0 ? List.of() : List.of("pollutants"),
+                snapshotId, generatedAt));
+        statuses.put("forecast", status(
+                forecastPeak != null && forecastPeak > 0 ? forecast.isFallbackUsed() ? "FALLBACK" : "AVAILABLE" : "UNAVAILABLE",
+                forecastOrigin(forecast),
+                forecast != null ? forecast.getOverallConfidence() : 0.0,
+                forecastPeak != null && forecastPeak > 0 ? "Forecast horizons contain valid predicted AQI values." : "No valid 24/48/72 forecast AQI values were returned.",
+                forecast != null && forecast.isFallbackUsed() ? List.of("Forecast uses fallback mode; inspect point fallback reasons for per-horizon limitations.") : List.of(),
+                forecastPeak != null && forecastPeak > 0 ? List.of() : List.of("forecast.24h", "forecast.48h", "forecast.72h"),
+                snapshotId, generatedAt));
+        statuses.put("attribution", status(
+                attribution.getSources() != null && !attribution.getSources().isEmpty() ? attribution.getOverallConfidence() < 0.35 ? "PARTIAL" : "DERIVED" : "UNAVAILABLE",
+                attribution.getSources() != null && !attribution.getSources().isEmpty() ? "DERIVED_FROM_REAL_DATA" : "UNAVAILABLE",
+                attribution.getOverallConfidence(),
+                valueOrDefault(attribution.getExplanation(), attribution.getSources() != null && !attribution.getSources().isEmpty() ? "Attribution sources returned." : "Attribution did not return source contributions."),
+                attribution.getOverallConfidence() < 0.35 ? List.of("Dominant source should be treated as uncertain; UNKNOWN share is retained.") : List.of(),
+                attribution.getSources() != null && !attribution.getSources().isEmpty() ? List.of() : List.of("source contributions"),
+                snapshotId, generatedAt));
+        statuses.put("geospatial", status(
+                "PARTIAL",
+                "DERIVED_FROM_REAL_DATA",
+                overallConfidence,
+                "Geospatial endpoint returns required live layers; exact provider geometries may be partial by layer.",
+                List.of("Layer-level metadata declares whether geometry is observed, derived, fallback, or unavailable."),
+                List.of(),
+                snapshotId, generatedAt));
+        statuses.put("enforcement", status(
+                enforcement.getRecommendations() != null && !enforcement.getRecommendations().isEmpty() ? "AVAILABLE" : "PARTIAL",
+                enforcement.getRecommendations() != null && !enforcement.getRecommendations().isEmpty() ? "RULE_BASED_INFERENCE" : "PRECISE_LIMITED_STATUS",
+                enforcementConfidence(enforcement),
+                enforcement.getRecommendations() != null && !enforcement.getRecommendations().isEmpty() ? "Rule-based enforcement recommendations generated from current AQI, forecast, and attribution." : "No enforcement recommendation crossed the rule threshold.",
+                enforcement.getRecommendations() != null && !enforcement.getRecommendations().isEmpty() ? List.of("Recommendations are operational guidance, not automated orders.") : List.of("No action is fabricated when rules do not produce a recommendation."),
+                List.of(),
+                snapshotId, generatedAt));
+        statuses.put("advisory", status(
+                advisories.getAdvisories() != null && !advisories.getAdvisories().isEmpty() ? "AVAILABLE" : "PARTIAL",
+                advisories.getAdvisories() != null && !advisories.getAdvisories().isEmpty() ? "RULE_BASED_INFERENCE" : "PRECISE_LIMITED_STATUS",
+                advisoryConfidence(advisories),
+                advisories.getAdvisories() != null && !advisories.getAdvisories().isEmpty() ? "Health advisories generated from AQI, forecast, exposure, and sensitive-group context." : "No audience-specific advisory crossed the rule threshold.",
+                advisories.getAdvisories() != null && !advisories.getAdvisories().isEmpty() ? List.of("Advice is AQI-guidance based and should not replace medical care.") : List.of("No advisory message is fabricated when inputs are too limited."),
+                List.of(),
+                snapshotId, generatedAt));
+        statuses.put("explainability", status(
+                "PARTIAL",
+                "DERIVED_FROM_REAL_DATA",
+                overallConfidence,
+                "Explainability is available from the dedicated endpoint and summary reflects current evidence bundle coverage.",
+                List.of("Detailed reasoning steps are resolved on demand through the explainability API."),
+                List.of(),
+                snapshotId, generatedAt));
+        statuses.put("copilot", status(
+                "PARTIAL",
+                "USER_CONTEXT",
+                overallConfidence,
+                "Copilot answers are generated on demand from decision, explainability, timeline, and geospatial outputs.",
+                List.of("Unsupported or under-evidenced questions return precise limited status instead of fabricated answers."),
+                List.of(),
+                snapshotId, generatedAt));
+        failures.forEach((module, reason) -> statuses.put(module, status("ERROR", "UNAVAILABLE", 0.0,
+                reason, List.of("Module threw while generating this decision response."), List.of(module), snapshotId, generatedAt)));
+        return statuses;
+    }
+
+    private ModuleStatus status(String status, String dataOrigin, double confidence, String reason,
+                                List<String> limitations, List<String> missingInputs,
+                                String snapshotId, Instant generatedAt) {
+        return ModuleStatus.builder()
+                .status(status)
+                .dataOrigin(dataOrigin)
+                .confidence(round(clamp(confidence, 0.0, 0.98)))
+                .reason(reason)
+                .limitations(limitations)
+                .missingInputs(missingInputs)
+                .snapshotId(snapshotId)
+                .generatedAt(generatedAt)
+                .build();
+    }
+
+    private boolean hasPollutants(Object value) {
+        Map<String, Object> pollutants = asStringObjectMap(value);
+        return pollutants.entrySet().stream()
+                .anyMatch(entry -> !"aqi".equalsIgnoreCase(entry.getKey()) && number(entry.getValue()) > 0);
+    }
+
+    private String forecastOrigin(ForecastResult forecast) {
+        if (forecast == null) return "UNAVAILABLE";
+        if (forecast.getForecast() == null || forecast.getForecast().isEmpty()) return "UNAVAILABLE";
+        return forecast.getForecast().values().stream()
+                .map(point -> valueOrDefault(point.getDataOrigin(), valueOrDefault(point.getEngine(), valueOrDefault(point.getMode(), forecast.getEngine()))))
+                .filter(value -> value != null && !value.isBlank() && !"UNAVAILABLE".equalsIgnoreCase(value))
+                .findFirst()
+                .orElse(forecast.isFallbackUsed() ? "PERSISTENCE_FALLBACK" : valueOrDefault(forecast.getMode(), "PROVIDER_FORECAST"));
+    }
+
+    private double providerConfidence(CityEnvironmentalContext context, String provider, double fallback) {
+        return context.getProviderConfidence() != null && context.getProviderConfidence().containsKey(provider)
+                ? context.getProviderConfidence().get(provider)
+                : fallback;
     }
 
     private SharedDecisionSnapshot sharedSnapshot(CityEnvironmentalContext context, ForecastResult forecast,

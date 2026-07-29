@@ -243,7 +243,7 @@ public class GeoSpatialIntelligenceService {
     private GeoSpatialLayer aqiHotspots(CityEnvironmentalContext context, AttributionResult attribution,
                                         EnforcementResult enforcement, DecisionIntelligenceResult decision,
                                         Point center, Map<String, Object> osmData, Instant generatedAt) {
-        int aqi = currentAqi(context, enforcement);
+        int aqi = (int) Math.round(firstPositive(currentAqi(context, enforcement), currentAqi(decision), forecastPeak(decision)));
         List<Map<String, Object>> boundaryFeatures = mergeFeatures(
                 importedFeatures("adminBoundaries"),
                 osmFeatures(osmData, "adminBoundaries")
@@ -255,6 +255,20 @@ public class GeoSpatialIntelligenceService {
             features = enrichFeatures(boundaryFeatures, baseProperties(riskLevel(aqi), aqi, 0, dominant(attribution, decision), 0,
                     confidence, "Investigate AQI hotspot", "", "AQI risk projected onto administrative boundary", List.of("aqi", "adminBoundaries")));
             metadata = metadata(sourceName(boundaryFeatures), "SUCCESS", "DERIVED_FROM_REAL_DATA", "AQI hotspot layer uses imported or OSM administrative boundary geometry.");
+        } else if (validCenter(center) && aqi > 0) {
+            Map<String, Object> props = baseProperties(riskLevel(aqi), aqi, 0, dominant(attribution, decision), 0,
+                    Math.min(confidence, 0.55), "Investigate selected-location AQI risk zone", "City command center",
+                    "Deterministic circular zone centered on the selected coordinates because exact hotspot geometry was not available.",
+                    List.of("aqi", "selectedLocation"));
+            props.put("radiusMeters", hotspotRadiusMeters(aqi));
+            props.put("featureKind", "CIRCLE");
+            props.put("geometrySource", "selected_location_circle");
+            props.put("dataOrigin", "DERIVED_FROM_REAL_DATA");
+            props.put("limitations", List.of("Circle is a decision-support risk area, not an observed administrative boundary or exact plume."));
+            features = List.of(feature("selected-location-aqi-hotspot", point(center), props));
+            confidence = Math.min(confidence, 0.55);
+            metadata = metadata("selected_location_circle", "DERIVED", "DERIVED_FROM_REAL_DATA",
+                    "AQI hotspot circle is derived from real selected coordinates and current/forecast AQI because exact hotspot geometry is unavailable.");
         } else {
             features = List.of();
             metadata = metadata("unavailable", "INSUFFICIENT_EVIDENCE", "UNAVAILABLE", "No real hotspot/admin geometry available; live mode does not generate synthetic AQI zones.");
@@ -272,13 +286,32 @@ public class GeoSpatialIntelligenceService {
         ForecastPoint point = forecast.getForecast() != null ? forecast.getForecast().get(horizonKey) : null;
         Integer predicted = point != null ? point.getPredictedAqi() : null;
         double confidence = point != null ? point.getConfidence() : 0.25;
-        List<Map<String, Object>> features = List.of();
+        List<Map<String, Object>> features;
+        Map<String, Object> metadata;
+        if (predicted != null && predicted > 0 && validCenter(center)) {
+            Map<String, Object> props = baseProperties(riskLevel(predicted), currentAqi(decision), predicted,
+                    dominant(point, decision), 0, confidence, "Monitor " + horizonKey + " forecast risk zone",
+                    "City command center", explanation(point), datasets(point));
+            props.put("radiusMeters", forecastRadiusMeters(type, predicted));
+            props.put("featureKind", "CIRCLE");
+            props.put("horizon", horizonKey);
+            props.put("geometrySource", "selected_location_circle");
+            props.put("dataOrigin", forecastOrigin(forecast, point));
+            props.put("limitations", List.of("Forecast circle is centered on selected coordinates; it is not a trained spatial plume grid."));
+            features = List.of(feature("forecast-risk-" + horizonKey, point(center), props));
+            metadata = metadata("selected_location_circle", "DERIVED", forecastOrigin(forecast, point),
+                    "Forecast risk circle is derived from a real forecast AQI value and selected coordinates.");
+        } else {
+            features = List.of();
+            metadata = metadata("unavailable", "UNAVAILABLE", "UNAVAILABLE", "No valid forecast AQI and coordinates were available for this horizon.");
+        }
         return layer(type, displayName,
                 "Forecast risk grid for " + horizonKey + " horizon.",
                 confidence, generatedAt, features,
                 legend("MODERATE", "#f6b93b", "HIGH", "#e55039", "SEVERE", "#b33939"),
-                metadata("unavailable", "UNAVAILABLE", "FORECAST", "Forecast grids disabled until trained-model output exists."),
-                List.of("Predicted AQI " + horizonKey + ": " + (predicted != null ? predicted : "UNAVAILABLE"), "Forecast trend: unavailable"));
+                metadata,
+                List.of("Predicted AQI " + horizonKey + ": " + (predicted != null ? predicted : "UNAVAILABLE"),
+                        "Forecast trend: " + value(point != null ? point.getTrend() : null, value(forecast.getOverallTrend(), "unavailable"))));
     }
 
     private GeoSpatialLayer sourceZones(AttributionResult attribution, DecisionIntelligenceResult decision, Point center, Instant generatedAt) {
@@ -321,7 +354,7 @@ public class GeoSpatialIntelligenceService {
             features = enrichFeatures(roadFeatures, baseProperties(riskLevel(currentAqi(decision)), currentAqi(decision), 0, dominant(decision), 0,
                     confidence, "Review traffic controls on mapped road corridor", "Traffic Police",
                     "OpenStreetMap road geometry used as an infrastructure proxy; not live traffic.", List.of("openstreetmap", "aqi")));
-            metadata = metadata("openstreetmap", "SUCCESS", "OBSERVED", "Traffic corridors use OpenStreetMap road geometries as infrastructure proxy, not real-time traffic.");
+            metadata = metadata("openstreetmap", "SUCCESS", "OBSERVED_REAL_DATA", "Traffic corridors use OpenStreetMap road geometries as infrastructure proxy, not real-time traffic.");
         } else {
             features = List.of();
             metadata = metadata("unavailable", "INSUFFICIENT_EVIDENCE", "UNAVAILABLE", "No OSM road geometry available; live mode does not generate synthetic traffic corridors.");
@@ -344,7 +377,7 @@ public class GeoSpatialIntelligenceService {
             features = enrichFeatures(imported, baseProperties(riskLevel(currentAqi(decision)), currentAqi(decision), 0, "CONSTRUCTION", 0,
                     Math.max(confidence, 0.72), "Inspect construction dust control", "Municipal Corporation",
                     "Imported construction GeoJSON layer", List.of("construction", "geojson", "aqi")));
-            metadata = metadata("geojson_import", "SUCCESS", "OBSERVED", "Construction sites loaded from configured GeoJSON import.");
+            metadata = metadata("geojson_import", "SUCCESS", "OBSERVED_REAL_DATA", "Construction sites loaded from configured GeoJSON import.");
             confidence = Math.max(confidence, 0.72);
         } else {
             features = List.of();
@@ -369,7 +402,7 @@ public class GeoSpatialIntelligenceService {
             features = enrichFeatures(imported, baseProperties(riskLevel(currentAqi(decision)), currentAqi(decision), 0, "INDUSTRIAL", 0,
                     Math.max(confidence, 0.78), "Inspect industrial emissions and compliance", "Pollution Control Board",
                     "Imported industrial GeoJSON layer", List.of("industries", "geojson", "aqi")));
-            metadata = metadata("geojson_import", "SUCCESS", "OBSERVED", "Industrial polygons loaded from configured GeoJSON import.");
+            metadata = metadata("geojson_import", "SUCCESS", "OBSERVED_REAL_DATA", "Industrial polygons loaded from configured GeoJSON import.");
             confidence = Math.max(confidence, 0.78);
         } else {
             features = List.of();
@@ -397,7 +430,7 @@ public class GeoSpatialIntelligenceService {
             features = enrichFeatures(sensitive, baseProperties(riskLevel(currentAqi(decision)), currentAqi(decision), 0, dominant(decision), 0,
                     confidence, "Protect sensitive receptors during high AQI", "Health and Education Departments",
                     "OSM schools/hospitals geometry", List.of("openstreetmap", "population", "advisory", "aqi")));
-            metadata = metadata("openstreetmap", "SUCCESS", "OBSERVED", "Sensitive zones use OpenStreetMap school and hospital geometry.");
+            metadata = metadata("openstreetmap", "SUCCESS", "OBSERVED_REAL_DATA", "Sensitive zones use OpenStreetMap school and hospital geometry.");
         } else {
             features = List.of();
             metadata = metadata("unavailable", "INSUFFICIENT_EVIDENCE", "UNAVAILABLE", "Sensitive-zone counts may be available, but no exact facility geometry was returned; live mode does not synthesize facilities.");
@@ -423,7 +456,7 @@ public class GeoSpatialIntelligenceService {
                 "Wind direction and speed vector from fused weather context.",
                 providerConfidence(context, "weather", 0.35), generatedAt, features,
                 legend("WIND", "#218c74", "LOW_DISPERSION", "#e55039", "NORMAL", "#227093"),
-                metadata("weather_vector", speed > 0 || direction > 0 ? "SUCCESS" : "UNAVAILABLE", speed > 0 || direction > 0 ? "OBSERVED" : "UNAVAILABLE", "Vector anchored at selected location using real weather wind speed/direction."),
+                metadata("weather_vector", speed > 0 || direction > 0 ? "SUCCESS" : "UNAVAILABLE", speed > 0 || direction > 0 ? "OBSERVED_REAL_DATA" : "UNAVAILABLE", "Vector anchored at selected location using real weather wind speed/direction."),
                 List.of("Wind speed: " + speed, "Wind direction: " + direction));
     }
 
@@ -438,7 +471,7 @@ public class GeoSpatialIntelligenceService {
             features = enrichFeatures(naturalFeatures, baseProperties(riskLevel(currentAqi(decision)), currentAqi(decision), 0, dominant(decision), 0,
                     confidence, "Prioritize green buffer action in low-cover zones", "Urban Forestry Department",
                     "OSM/imported parks and water-body geometry", List.of("openstreetmap", "greenCover", "satellite")));
-            metadata = metadata(sourceName(naturalFeatures), "SUCCESS", "OBSERVED", "Green cover layer uses OSM or imported parks/water bodies.");
+            metadata = metadata(sourceName(naturalFeatures), "SUCCESS", "OBSERVED_REAL_DATA", "Green cover layer uses OSM or imported parks/water bodies.");
         } else {
             features = List.of();
             metadata = metadata("unavailable", greenIndex > 0 ? "PARTIAL" : "UNAVAILABLE", greenIndex > 0 ? "DERIVED_FROM_REAL_DATA" : "UNAVAILABLE", "Green-cover measurement has no real polygon geometry; live mode does not synthesize green-cover zones.");
@@ -460,7 +493,7 @@ public class GeoSpatialIntelligenceService {
                 "Earth Engine or satellite-derived evidence layer.",
                 providerConfidence(context, "satellite", measurementFallback ? 0.35 : 0.70), generatedAt, features,
                 legend("SATELLITE", "#596275", "THERMAL", "#e55039", "FALLBACK", "#d99b18"),
-                metadata("earth_engine", status, measurementFallback ? "DERIVED_FROM_REAL_DATA" : "OBSERVED", measurementFallback ? "Satellite provider used measurement-level fallback with no map geometry." : "Satellite measurements are available; no synthetic live geometry is generated."),
+                metadata("earth_engine", status, measurementFallback ? "DERIVED_FROM_REAL_DATA" : "OBSERVED_REAL_DATA", measurementFallback ? "Satellite provider used measurement-level fallback with no map geometry." : "Satellite measurements are available; no synthetic live geometry is generated."),
                 List.of("Satellite available: " + satellite.getOrDefault("available", false), "Measurement fallback: " + measurementFallback));
     }
 
@@ -693,6 +726,42 @@ public class GeoSpatialIntelligenceService {
             return List.of("forecast");
         }
         return point.getExplanation().getDataUsed();
+    }
+
+    private int forecastPeak(DecisionIntelligenceResult decision) {
+        ForecastResult forecast = decision != null ? decision.getForecast() : null;
+        return forecast != null && forecast.getForecast() != null
+                ? forecast.getForecast().values().stream()
+                        .map(ForecastPoint::getPredictedAqi)
+                        .filter(value -> value != null && value > 0)
+                        .mapToInt(Integer::intValue)
+                        .max()
+                        .orElse(0)
+                : 0;
+    }
+
+    private boolean validCenter(Point center) {
+        return center != null && center.lat() != 0.0 && center.lng() != 0.0;
+    }
+
+    private int hotspotRadiusMeters(int aqi) {
+        return (int) Math.round(clamp(900 + aqi * 7.5, 1200, 4500));
+    }
+
+    private int forecastRadiusMeters(GeoSpatialLayerType type, int predictedAqi) {
+        int horizonBoost = switch (type) {
+            case FORECAST_GRID_48H -> 500;
+            case FORECAST_GRID_72H -> 900;
+            default -> 0;
+        };
+        return (int) Math.round(clamp(1000 + predictedAqi * 6.0 + horizonBoost, 1200, 5200));
+    }
+
+    private String forecastOrigin(ForecastResult forecast, ForecastPoint point) {
+        String origin = point != null ? value(point.getDataOrigin(), value(point.getEngine(), value(point.getMode(), ""))) : "";
+        if (!origin.isBlank()) return origin;
+        if (forecast != null && forecast.isFallbackUsed()) return "PERSISTENCE_FALLBACK";
+        return value(forecast != null ? value(forecast.getEngine(), forecast.getMode()) : "", "PROVIDER_FORECAST");
     }
 
     private double providerConfidence(CityEnvironmentalContext context, String provider, double fallback) {
