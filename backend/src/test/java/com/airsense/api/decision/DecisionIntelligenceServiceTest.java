@@ -140,9 +140,12 @@ class DecisionIntelligenceServiceTest {
         assertThat(result.getEnforcement().getSnapshotId()).isEqualTo(result.getSharedSnapshot().getSnapshotId());
         assertThat(result.getAdvisories().getSnapshotId()).isEqualTo(result.getSharedSnapshot().getSnapshotId());
         assertThat(result.getModuleStatuses()).containsKeys("currentAqi", "pollutants", "forecast",
-                "attribution", "geospatial", "enforcement", "advisory", "explainability", "copilot");
+                "attribution", "geospatial", "citySummary", "enforcement", "advisory", "explainability", "copilot");
         assertThat(result.getModuleStatuses().get("currentAqi").getDataOrigin()).isEqualTo("OBSERVED_REAL_DATA");
         assertThat(result.getModuleStatuses().get("forecast").getStatus()).isEqualTo("AVAILABLE");
+        assertThat(result.getModuleStatuses().values()).allSatisfy(status -> assertThat(status.getDataOrigin())
+                .isIn("OBSERVED_REAL_DATA", "DERIVED_FROM_REAL_DATA", "OPEN_METEO_PROVIDER_FORECAST",
+                        "PERSISTENCE_FALLBACK", "RULE_BASED_INFERENCE", "USER_CONTEXT", "UNAVAILABLE"));
     }
 
     @Test

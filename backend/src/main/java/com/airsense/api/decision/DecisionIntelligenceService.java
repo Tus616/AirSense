@@ -542,9 +542,19 @@ public class DecisionIntelligenceService {
                 List.of("Layer-level metadata declares whether geometry is observed, derived, fallback, or unavailable."),
                 List.of(),
                 snapshotId, generatedAt));
+        Map<String, Object> citySummary = asStringObjectMap(signals.get("citySummary"));
+        boolean citySummaryAvailable = Boolean.TRUE.equals(citySummary.get("available")) || number(citySummary.get("freshStationCount")) >= 2;
+        statuses.put("citySummary", status(
+                citySummaryAvailable ? "AVAILABLE" : "PARTIAL",
+                citySummaryAvailable ? "DERIVED_FROM_REAL_DATA" : currentAqi != null && currentAqi > 0 ? "OBSERVED_REAL_DATA" : "UNAVAILABLE",
+                citySummaryAvailable ? providerConfidence(context, "aqi", 0.62) : currentAqi != null && currentAqi > 0 ? 0.45 : 0.0,
+                citySummaryAvailable ? "City summary is derived from multiple fresh same-standard stations." : currentAqi != null && currentAqi > 0 ? "Local location AQI available. City-wide summary requires multiple fresh, same-standard stations." : "No valid local AQI or compatible city station set is available.",
+                citySummaryAvailable ? List.of("Summary is limited to compatible fresh stations.") : List.of("A single local/provider AQI is not presented as a city average."),
+                citySummaryAvailable ? List.of() : List.of("multiple fresh same-standard stations"),
+                snapshotId, generatedAt));
         statuses.put("enforcement", status(
                 enforcement.getRecommendations() != null && !enforcement.getRecommendations().isEmpty() ? "AVAILABLE" : "PARTIAL",
-                enforcement.getRecommendations() != null && !enforcement.getRecommendations().isEmpty() ? "RULE_BASED_INFERENCE" : "PRECISE_LIMITED_STATUS",
+                "RULE_BASED_INFERENCE",
                 enforcementConfidence(enforcement),
                 enforcement.getRecommendations() != null && !enforcement.getRecommendations().isEmpty() ? "Rule-based enforcement recommendations generated from current AQI, forecast, and attribution." : "No enforcement recommendation crossed the rule threshold.",
                 enforcement.getRecommendations() != null && !enforcement.getRecommendations().isEmpty() ? List.of("Recommendations are operational guidance, not automated orders.") : List.of("No action is fabricated when rules do not produce a recommendation."),
@@ -552,7 +562,7 @@ public class DecisionIntelligenceService {
                 snapshotId, generatedAt));
         statuses.put("advisory", status(
                 advisories.getAdvisories() != null && !advisories.getAdvisories().isEmpty() ? "AVAILABLE" : "PARTIAL",
-                advisories.getAdvisories() != null && !advisories.getAdvisories().isEmpty() ? "RULE_BASED_INFERENCE" : "PRECISE_LIMITED_STATUS",
+                "RULE_BASED_INFERENCE",
                 advisoryConfidence(advisories),
                 advisories.getAdvisories() != null && !advisories.getAdvisories().isEmpty() ? "Health advisories generated from AQI, forecast, exposure, and sensitive-group context." : "No audience-specific advisory crossed the rule threshold.",
                 advisories.getAdvisories() != null && !advisories.getAdvisories().isEmpty() ? List.of("Advice is AQI-guidance based and should not replace medical care.") : List.of("No advisory message is fabricated when inputs are too limited."),
@@ -603,11 +613,20 @@ public class DecisionIntelligenceService {
     private String forecastOrigin(ForecastResult forecast) {
         if (forecast == null) return "UNAVAILABLE";
         if (forecast.getForecast() == null || forecast.getForecast().isEmpty()) return "UNAVAILABLE";
-        return forecast.getForecast().values().stream()
+        String origin = forecast.getForecast().values().stream()
                 .map(point -> valueOrDefault(point.getDataOrigin(), valueOrDefault(point.getEngine(), valueOrDefault(point.getMode(), forecast.getEngine()))))
                 .filter(value -> value != null && !value.isBlank() && !"UNAVAILABLE".equalsIgnoreCase(value))
                 .findFirst()
                 .orElse(forecast.isFallbackUsed() ? "PERSISTENCE_FALLBACK" : valueOrDefault(forecast.getMode(), "PROVIDER_FORECAST"));
+        return normalizedForecastOrigin(origin, forecast.isFallbackUsed());
+    }
+
+    private String normalizedForecastOrigin(String origin, boolean fallbackUsed) {
+        String value = origin != null ? origin.toUpperCase(Locale.ROOT) : "";
+        if (value.startsWith("OPEN_METEO_PROVIDER_FORECAST")) return "OPEN_METEO_PROVIDER_FORECAST";
+        if (value.contains("PERSISTENCE") || fallbackUsed) return "PERSISTENCE_FALLBACK";
+        if (value.isBlank() || "UNAVAILABLE".equals(value)) return "UNAVAILABLE";
+        return "DERIVED_FROM_REAL_DATA";
     }
 
     private double providerConfidence(CityEnvironmentalContext context, String provider, double fallback) {

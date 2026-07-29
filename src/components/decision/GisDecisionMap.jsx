@@ -207,8 +207,13 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
                   </LayerGroup>
                 </LayersControl.Overlay>
                 {backendLayers.map((layer) => (
-                  <LayersControl.Overlay checked name={labelize(layer.displayName || layer.layerType || layer.layerId, "Layer")} key={layer.layerId || layer.layerType}>
-                    <GeoJSON data={featureCollection(layer)} pointToLayer={(feature, latlng) => pointToLayer(layer, feature, latlng)} style={(feature) => featureStyle(layer, feature)}>
+                  <LayersControl.Overlay checked name={labelize(layer.displayName || layer.layerType || layer.layerId, "Layer")} key={`${snapshot?.snapshotId || geoSpatial?.generatedAt || "live"}-${layer.layerId || layer.layerType}`}>
+                    <GeoJSON
+                      data={featureCollection(layer)}
+                      pointToLayer={(feature, latlng) => pointToLayer(layer, feature, latlng)}
+                      style={(feature) => featureStyle(layer, feature)}
+                      onEachFeature={(feature, leafletLayer) => bindFeatureInteractions(layer, feature, leafletLayer)}
+                    >
                       <Tooltip direction="top">{layerTooltip(layer)}</Tooltip>
                     </GeoJSON>
                   </LayersControl.Overlay>
@@ -334,6 +339,48 @@ function layerTooltip(layer) {
     toDisplayText(layer?.metadata?.dataOrigin || layer?.dataOrigin, ""),
     toDisplayText(layer?.metadata?.note || layer?.evidenceSummary, ""),
   ].filter(Boolean).join(" | ");
+}
+
+function bindFeatureInteractions(layer, feature, leafletLayer) {
+  const props = feature?.properties || {};
+  const title = props.riskLevel
+    ? `${labelize(props.riskLevel)} risk`
+    : labelize(layer?.displayName || layer?.layerType, "Layer feature");
+  const tooltip = [
+    title,
+    props.forecastAqi || props.predictedAqi ? `AQI ${props.forecastAqi || props.predictedAqi}` : "",
+    props.confidence != null ? `Confidence ${Math.round(Number(props.confidence) * 100)}%` : "",
+  ].filter(Boolean).join(" | ");
+  leafletLayer.bindTooltip(tooltip);
+  leafletLayer.bindPopup(featurePopupHtml(layer, props));
+}
+
+function featurePopupHtml(layer, props) {
+  const rows = [
+    ["Risk", props.riskLevel],
+    ["Risk score", props.riskScore],
+    ["Forecast AQI", props.forecastAqi || props.predictedAqi],
+    ["Reason", props.reason || props.evidenceSummary],
+    ["Evidence", toDisplayText(props.dominantEvidence || props.datasetsUsed, "")],
+    ["Confidence", props.confidence != null ? `${Math.round(Number(props.confidence) * 100)}%` : ""],
+    ["Action", props.recommendedAction || props.recommendation],
+    ["Origin", props.dataOrigin || layer?.metadata?.dataOrigin],
+  ].filter(([, value]) => value !== null && value !== undefined && value !== "");
+  return `
+    <div class="decision-map-popup">
+      <strong>${escapeHtml(labelize(layer?.displayName || layer?.layerType, "Map feature"))}</strong>
+      ${rows.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(toDisplayText(value, ""))}</b></div>`).join("")}
+    </div>
+  `;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function colorFor(layer, props) {

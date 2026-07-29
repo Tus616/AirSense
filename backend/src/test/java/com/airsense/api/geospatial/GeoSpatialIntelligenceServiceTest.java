@@ -48,7 +48,7 @@ class GeoSpatialIntelligenceServiceTest {
 
         assertThat(result.getLayers()).allSatisfy(layer -> assertThat(layer.getMetadata().get("dataOrigin"))
                 .isIn("OBSERVED_REAL_DATA", "DERIVED_FROM_REAL_DATA", "OPEN_METEO_PROVIDER_FORECAST",
-                        "TRAINED_MODEL", "PROVIDER_FORECAST", "PERSISTENCE_FALLBACK", "UNAVAILABLE"));
+                        "PERSISTENCE_FALLBACK", "UNAVAILABLE"));
     }
 
     @Test

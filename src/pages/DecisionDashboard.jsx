@@ -1266,7 +1266,7 @@ function CurrentAqiCard({ decision }) {
 function CitySummaryCard({ decision }) {
   const summary = decision?.environmentalSignals?.citySummary || decision?.citySummary || {};
   const hasSummary = Object.keys(summary || {}).length > 0;
-  const status = hasSummary ? "Derived from fresh same-standard city stations" : moduleStatusReason(statusFor(decision, "currentAqi"), "Fresh same-standard station coverage is insufficient.");
+  const status = hasSummary ? "Derived from fresh same-standard city stations" : moduleStatusReason(statusFor(decision, "citySummary"), "Fresh same-standard station coverage is insufficient.");
   const items = [
     ["Avg AQI", summary.medianAqi ?? summary.medianAQI],
     ["Stations", summary.freshStationCount ?? summary.stationCount],

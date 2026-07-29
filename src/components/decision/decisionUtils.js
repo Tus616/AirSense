@@ -71,10 +71,29 @@ export function labelize(value, fallback = "Unknown") {
   return toDisplayText(value, fallback).replace(/_/g, " ");
 }
 
+export function friendlyEnum(value, fallback = "Unknown") {
+  const key = String(value || "").toUpperCase();
+  const labels = {
+    AVAILABLE: "Available",
+    DERIVED: "Derived",
+    FALLBACK: "Fallback",
+    PARTIAL: "Limited evidence",
+    UNAVAILABLE: "No reliable data",
+    ERROR: "Error",
+    OBSERVED_REAL_DATA: "Observed live data",
+    DERIVED_FROM_REAL_DATA: "Derived from live evidence",
+    OPEN_METEO_PROVIDER_FORECAST: "Atmospheric forecast",
+    PERSISTENCE_FALLBACK: "Persistence fallback",
+    RULE_BASED_INFERENCE: "Rule-based guidance",
+    USER_CONTEXT: "User-context response",
+  };
+  return labels[key] || labelize(value, fallback);
+}
+
 export function moduleStatusLabel(status, fallback = "Status unavailable") {
   if (!status || typeof status !== "object") return fallback;
-  const state = labelize(status.status, "");
-  const origin = labelize(status.dataOrigin, "");
+  const state = friendlyEnum(status.status, "");
+  const origin = friendlyEnum(status.dataOrigin, "");
   if (state && origin) return `${state} - ${origin}`;
   return state || origin || fallback;
 }

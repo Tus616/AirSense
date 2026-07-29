@@ -256,16 +256,26 @@ public class GeoSpatialIntelligenceService {
                     confidence, "Investigate AQI hotspot", "", "AQI risk projected onto administrative boundary", List.of("aqi", "adminBoundaries")));
             metadata = metadata(sourceName(boundaryFeatures), "SUCCESS", "DERIVED_FROM_REAL_DATA", "AQI hotspot layer uses imported or OSM administrative boundary geometry.");
         } else if (validCenter(center) && aqi > 0) {
-            Map<String, Object> props = baseProperties(riskLevel(aqi), aqi, 0, dominant(attribution, decision), 0,
+            Map<String, Object> props = baseProperties(hotspotRiskLevel(aqi), aqi, forecastPeak(decision), dominant(attribution, decision), 0,
                     Math.min(confidence, 0.55), "Investigate selected-location AQI risk zone", "City command center",
                     "Deterministic circular zone centered on the selected coordinates because exact hotspot geometry was not available.",
                     List.of("aqi", "selectedLocation"));
+            String featureId = "selected-location-aqi-hotspot";
+            props.put("id", featureId);
+            props.put("latitude", center.lat());
+            props.put("longitude", center.lng());
             props.put("radiusMeters", hotspotRadiusMeters(aqi));
             props.put("featureKind", "CIRCLE");
+            props.put("riskScore", hotspotRiskScore(aqi));
+            props.put("forecastAqi", forecastPeak(decision) > 0 ? forecastPeak(decision) : aqi);
+            props.put("dominantEvidence", List.of("currentAqi", "forecastAqi", "selectedLocation"));
             props.put("geometrySource", "selected_location_circle");
             props.put("dataOrigin", "DERIVED_FROM_REAL_DATA");
+            props.put("reason", "Hotspot risk derived from selected-location AQI/forecast evidence because exact hotspot geometry was not available.");
+            props.put("recommendedAction", "Use this as a low-precision monitoring zone; confirm with station, road, source, and field evidence before targeted enforcement.");
+            props.put("snapshotId", decision != null ? decision.getSnapshotId() : null);
             props.put("limitations", List.of("Circle is a decision-support risk area, not an observed administrative boundary or exact plume."));
-            features = List.of(feature("selected-location-aqi-hotspot", point(center), props));
+            features = List.of(feature(featureId, point(center), props));
             confidence = Math.min(confidence, 0.55);
             metadata = metadata("selected_location_circle", "DERIVED", "DERIVED_FROM_REAL_DATA",
                     "AQI hotspot circle is derived from real selected coordinates and current/forecast AQI because exact hotspot geometry is unavailable.");
@@ -748,6 +758,18 @@ public class GeoSpatialIntelligenceService {
         return (int) Math.round(clamp(900 + aqi * 7.5, 1200, 4500));
     }
 
+    private int hotspotRiskScore(int aqi) {
+        return (int) Math.round(clamp(aqi / 5.0, 1, 100));
+    }
+
+    private String hotspotRiskLevel(int aqi) {
+        int score = hotspotRiskScore(aqi);
+        if (score >= 70) return "CRITICAL";
+        if (score >= 45) return "HIGH";
+        if (score >= 25) return "MODERATE";
+        return "LOW";
+    }
+
     private int forecastRadiusMeters(GeoSpatialLayerType type, int predictedAqi) {
         int horizonBoost = switch (type) {
             case FORECAST_GRID_48H -> 500;
@@ -759,9 +781,13 @@ public class GeoSpatialIntelligenceService {
 
     private String forecastOrigin(ForecastResult forecast, ForecastPoint point) {
         String origin = point != null ? value(point.getDataOrigin(), value(point.getEngine(), value(point.getMode(), ""))) : "";
-        if (!origin.isBlank()) return origin;
-        if (forecast != null && forecast.isFallbackUsed()) return "PERSISTENCE_FALLBACK";
-        return value(forecast != null ? value(forecast.getEngine(), forecast.getMode()) : "", "PROVIDER_FORECAST");
+        String fallback = forecast != null ? value(forecast.getEngine(), forecast.getMode()) : "";
+        String normalized = value(origin, value(fallback, ""));
+        String value = normalized != null ? normalized.toUpperCase(java.util.Locale.ROOT) : "";
+        if (value.startsWith("OPEN_METEO_PROVIDER_FORECAST")) return "OPEN_METEO_PROVIDER_FORECAST";
+        if (value.contains("PERSISTENCE") || (forecast != null && forecast.isFallbackUsed())) return "PERSISTENCE_FALLBACK";
+        if (value.isBlank() || "UNAVAILABLE".equals(value)) return "UNAVAILABLE";
+        return "DERIVED_FROM_REAL_DATA";
     }
 
     private double providerConfidence(CityEnvironmentalContext context, String provider, double fallback) {

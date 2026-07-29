@@ -8,7 +8,7 @@ Decision responses expose `moduleStatuses` keyed by module. Each entry includes 
 
 Allowed status values used by the backend are `AVAILABLE`, `DERIVED`, `FALLBACK`, `PARTIAL`, `UNAVAILABLE`, and `ERROR`.
 
-Allowed data-origin values used by the backend are `OBSERVED_REAL_DATA`, `DERIVED_FROM_REAL_DATA`, `OPEN_METEO_PROVIDER_FORECAST`, `PERSISTENCE_FALLBACK`, `RULE_BASED_INFERENCE`, `USER_CONTEXT`, `PRECISE_LIMITED_STATUS`, and `UNAVAILABLE`.
+Allowed data-origin values used by the backend are `OBSERVED_REAL_DATA`, `DERIVED_FROM_REAL_DATA`, `OPEN_METEO_PROVIDER_FORECAST`, `PERSISTENCE_FALLBACK`, `RULE_BASED_INFERENCE`, `USER_CONTEXT`, and `UNAVAILABLE`.
 
 ## Findings and fallback decisions
 
@@ -23,7 +23,7 @@ Allowed data-origin values used by the backend are `OBSERVED_REAL_DATA`, `DERIVE
 | Map circles | Point GeoJSON rendered as pixel circle markers only. | `GisDecisionMap.jsx` now renders any point feature with `radiusMeters` as a Leaflet meter-radius circle. |
 | Enforcement | Empty action queues displayed as unavailable. | `moduleStatuses.enforcement` distinguishes rule-based actions from precise limited status when no recommendation crosses thresholds. UI shows the reason when the queue is empty. |
 | Health advisory | Empty advisory groups displayed as no returned advisory. | Decision status marks advisory as rule-based available or precise limited status. Existing UI keeps non-fabricated empty state. |
-| City summary | Missing city summary displayed as insufficient. | UI now reports the reason as insufficient fresh same-standard station coverage rather than inventing a city aggregate. |
+| City summary | Missing city summary displayed as insufficient. | `moduleStatuses.citySummary` distinguishes multi-station derived summaries from local-only AQI. UI now reports: local location AQI is available, but city-wide summary requires multiple fresh same-standard stations. |
 | Explainability | Summary can be partial while detailed endpoint is on demand. | `moduleStatuses.explainability` marks partial derived status and points to the dedicated endpoint behavior. |
 | Copilot | Unsupported or under-evidenced answers can return unavailable. | `moduleStatuses.copilot` marks on-demand user-context status and documents that unsupported questions return precise limited status. |
 | Geospatial exact source zones | Exact construction, industrial, sensitive, green, satellite geometries may be absent. | These remain layer-level `UNAVAILABLE` or `PARTIAL` with exact metadata reasons unless real OSM/imported/provider geometry exists. No synthetic facility/source polygons are generated. |

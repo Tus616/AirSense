@@ -6750,6 +6750,36 @@ body,
   min-height: 34px;
 }
 
+.decision-map-popup {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+  max-width: 300px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.decision-map-popup strong {
+  display: block;
+  font-size: 0.86rem;
+  color: #0f172a;
+}
+
+.decision-map-popup div {
+  display: grid;
+  gap: 2px;
+}
+
+.decision-map-popup span {
+  color: #64748b;
+}
+
+.decision-map-popup b {
+  color: #111827;
+  font-weight: 700;
+  white-space: normal;
+}
+
 .uqi-panel--map-page .decision-map-shell {
   height: clamp(440px, 64vh, 760px);
 }
