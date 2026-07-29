@@ -63,6 +63,18 @@ def test_readiness_and_forecast_status_endpoints():
     assert data["providerFallbackAvailable"] is True
     assert "CHRONOS_BOLT_ZERO_SHOT" in data["loadedEngineNames"]
 
+def test_readiness_does_not_load_chronos_when_disabled(monkeypatch):
+    monkeypatch.setattr(chronos_service, "enabled", False)
+    monkeypatch.setattr(chronos_service, "load", lambda: (_ for _ in ()).throw(AssertionError("Chronos load should not run")))
+
+    ready = client.get("/ready")
+    status = client.get("/internal/forecast/status")
+
+    assert ready.status_code == 200
+    assert ready.json()["chronosModelLoaded"] is False
+    assert status.status_code == 200
+    assert status.json()["modelLoaded"] is False
+
 def test_promoted_artifact_absence_uses_persistence_for_delhi_mumbai(monkeypatch):
     monkeypatch.setattr(chronos_service, "predict", lambda values, horizons: ({}, "INSUFFICIENT_HISTORY_FOR_CHRONOS"))
     for loc, latitude, longitude in [

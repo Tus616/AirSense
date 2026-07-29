@@ -154,6 +154,10 @@ diagnostics:
   cpcb:
     freshness-minutes: ${CPCB_FRESHNESS_MINUTES:180}
 
+legacy:
+  forecast:
+    enabled: ${LEGACY_FORECAST_ENABLED:false}
+
 google:
   application:
     credentials: ${GOOGLE_APPLICATION_CREDENTIALS:}

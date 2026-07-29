@@ -1,0 +1,10 @@
+.pytest_cache
+.chrome-*
+.tmp-chrome-*
+.codex-chrome-*
+backend
+ai-service
+.env
+.env.*
+node_modules
+dist

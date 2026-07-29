@@ -47,7 +47,6 @@ export default function AnalyticsCharts({ activeWard = "W01" }) {
       const data = await getAttributionLatest(activeWard);
       setAttributionData(data);
     } catch (e) {
-      console.log("No attribution data found for", activeWard);
       setAttributionData(null);
     } finally {
       setLoadingAttr(false);

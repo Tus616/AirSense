@@ -18,7 +18,7 @@ class ChronosService:
     def __init__(self) -> None:
         self.model_id = os.getenv("CHRONOS_MODEL_ID", "amazon/chronos-bolt-tiny")
         self.device = os.getenv("CHRONOS_DEVICE", "cpu")
-        self.enabled = os.getenv("CHRONOS_ENABLED", "true").lower() == "true"
+        self.enabled = os.getenv("CHRONOS_ENABLED", "false").lower() == "true"
         self.min_history_hours = int(os.getenv("CHRONOS_MIN_HISTORY_HOURS", "48"))
         self.context_hours = int(os.getenv("CHRONOS_CONTEXT_HOURS", "168"))
         self._pipeline = None

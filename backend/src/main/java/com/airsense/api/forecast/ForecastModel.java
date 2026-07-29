@@ -4,6 +4,7 @@ import com.airsense.api.entities.Prediction;
 import com.airsense.api.services.ForecastClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import java.util.Map;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "legacy.forecast", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class ForecastModel {
     private static final List<Integer> HORIZONS = List.of(24, 48, 72);

@@ -1,0 +1,4 @@
+# Optional Chronos-Bolt zero-shot forecasting dependencies.
+# Install only when CHRONOS_ENABLED=true and the runtime has enough memory.
+torch>=2.2,<3
+chronos-forecasting>=2.1,<3

@@ -11,5 +11,3 @@ pytest
 motor
 python-dotenv
 httpx
-torch>=2.2,<3
-chronos-forecasting>=2.1,<3

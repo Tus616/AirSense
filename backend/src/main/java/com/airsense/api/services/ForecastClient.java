@@ -3,6 +3,7 @@ package com.airsense.api.services;
 import com.airsense.api.entities.Prediction;
 import com.airsense.api.entities.GridForecast;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.ParameterizedTypeReference;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@ConditionalOnProperty(prefix = "legacy.forecast", name = "enabled", havingValue = "true")
 public class ForecastClient {
 
     @Value("${ai.service.base-url:http://localhost:8000}")

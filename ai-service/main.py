@@ -47,8 +47,9 @@ class Settings(PydanticBaseSettings):
     chronos_device: str = "cpu"
     chronos_min_history_hours: int = 48
     chronos_context_hours: int = 168
-    chronos_enabled: bool = True
+    chronos_enabled: bool = False
     open_meteo_forecast_enabled: bool = True
+    legacy_model_startup_enabled: bool = False
 
     # CORS — comma-separated list of allowed origins.
     # Do NOT use '*' in production when allow_credentials=True.
@@ -81,20 +82,39 @@ def configured_model_dir() -> Path:
     return resolve_model_dir(settings.ml_model_dir or settings.model_dir)
 
 
+def registry_diagnostics() -> dict:
+    if not settings.legacy_model_startup_enabled:
+        return {
+            "artifactDirectory": str(configured_model_dir()),
+            "artifactDirectoryAccessible": False,
+            "registryEntries": 0,
+            "promotedModelCount": 0,
+            "loadedModelCount": 0,
+            "supportedModelFamilies": [],
+            "rejectedModelCount": 0,
+            "rejections": [],
+            "startupWarnings": ["LEGACY_MODEL_REGISTRY_DISABLED"],
+        }
+    return discover_registry(configured_model_dir(), load_models=False)
+
+
 # ---------------------------------------------------------------------------
 # Lifespan (replaces deprecated @app.on_event)
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("AI service model directory resolved to %s", configured_model_dir())
-    STARTUP_STATE["modelRegistryDiagnostics"] = discover_registry(configured_model_dir(), load_models=False)
+    STARTUP_STATE["modelRegistryDiagnostics"] = registry_diagnostics()
     STARTUP_STATE["startupWarnings"] = STARTUP_STATE["modelRegistryDiagnostics"].get("startupWarnings", [])
-    try:
-        loaded = load_models()
-        logger.info("Legacy top-level model loaded on startup: %s", loaded)
-    except Exception as exc:
-        STARTUP_STATE["startupWarnings"].append("LEGACY_MODEL_LOAD_FAILED")
-        logger.warning("Legacy top-level model load failed safely: %s", exc)
+    if settings.legacy_model_startup_enabled:
+        try:
+            loaded = load_models()
+            logger.info("Legacy top-level model loaded on startup: %s", loaded)
+        except Exception as exc:
+            STARTUP_STATE["startupWarnings"].append("LEGACY_MODEL_LOAD_FAILED")
+            logger.warning("Legacy top-level model load failed safely: %s", exc)
+    else:
+        logger.info("Legacy top-level model startup load disabled; provider forecast path remains available.")
     STARTUP_STATE["applicationInitialized"] = True
     yield
     # Shutdown: nothing to clean up
@@ -640,13 +660,13 @@ def health_check():
 
 @app.get("/ready")
 def ready_check():
-    diagnostics = discover_registry(configured_model_dir(), load_models=False)
+    diagnostics = registry_diagnostics()
     ready = STARTUP_STATE["applicationInitialized"] and STARTUP_STATE["inferenceModuleImported"]
     return {
         "status": "ready" if ready else "not_ready",
         "applicationInitialized": STARTUP_STATE["applicationInitialized"],
         "inferenceModuleImported": STARTUP_STATE["inferenceModuleImported"],
-        "chronosPackageImported": chronos_service.load() if chronos_service.enabled else False,
+        "chronosPackageImported": chronos_service.enabled,
         "chronosModelLoaded": chronos_service.loaded,
         "chronosStatus": chronos_service.status(),
         "providerClientConfigured": STARTUP_STATE["providerClientConfigured"],
@@ -660,7 +680,7 @@ def ready_check():
 
 @app.get("/internal/forecast/status")
 def internal_forecast_status():
-    diagnostics = discover_registry(configured_model_dir(), load_models=False)
+    diagnostics = registry_diagnostics()
     chronos = chronos_service.status()
     return {
         "serviceStatus": "ready",

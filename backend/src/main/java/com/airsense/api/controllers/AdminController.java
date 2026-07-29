@@ -4,6 +4,7 @@ import com.airsense.api.services.AttributionEngineService;
 import com.airsense.api.services.GridGenerationService;
 import com.airsense.api.ingestion.ForecastOrchestrator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,7 +26,7 @@ public class AdminController {
     private GridGenerationService gridGenerationService;
 
     @Autowired
-    private ForecastOrchestrator forecastOrchestrator;
+    private ObjectProvider<ForecastOrchestrator> forecastOrchestrator;
 
     @PostMapping("/attribution/run")
     public ResponseEntity<?> runAttribution(
@@ -48,7 +49,14 @@ public class AdminController {
 
     @PostMapping("/forecast/grid/run")
     public ResponseEntity<?> runGridForecast(@RequestParam String cityId) {
-        forecastOrchestrator.runForecasts();
+        ForecastOrchestrator orchestrator = forecastOrchestrator.getIfAvailable();
+        if (orchestrator == null) {
+            return ResponseEntity.status(410).body(Map.of(
+                    "status", "disabled",
+                    "message", "Legacy grid forecast generation is disabled. Production forecasting uses decision intelligence and /internal/forecast/predict."
+            ));
+        }
+        orchestrator.runForecasts();
         return ResponseEntity.ok(Map.of("message", "Forecast orchestrator triggered"));
     }
 }
