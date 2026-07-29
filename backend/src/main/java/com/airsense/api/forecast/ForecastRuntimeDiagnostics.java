@@ -34,6 +34,8 @@ public class ForecastRuntimeDiagnostics {
         data.put("aiServiceHost", host(environment.getProperty("ai.service.base-url", "")));
         data.put("mlForecastServiceUrl", normalize(mlForecastProperties.getServiceUrl()));
         data.put("mlForecastEnabled", mlForecastProperties.isEnabled());
+        data.put("mlForecastConfiguredTimeoutSeconds", mlForecastProperties.getTimeoutSeconds());
+        data.put("mlForecastEffectiveTimeoutSeconds", mlForecastClient.effectiveTimeoutSeconds());
         data.put("providerForecastStandard", mlForecastProperties.getProviderForecastStandard());
         data.put("providerForecastProvider", mlForecastProperties.getProviderForecastProvider());
         data.put("lastAiRequest", forecastOrchestrator.lastForecastTrace());

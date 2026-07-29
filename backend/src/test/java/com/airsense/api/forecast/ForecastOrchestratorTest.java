@@ -2,10 +2,14 @@ package com.airsense.api.forecast;
 
 import com.airsense.api.config.AirQualityOperationsProperties;
 import com.airsense.api.attribution.PollutionAttributionService;
+import com.airsense.api.entities.AqiForecastRun;
 import com.airsense.api.entities.ForecastModelRegistryEntry;
 import com.airsense.api.fusion.CityEnvironmentalContext;
 import com.airsense.api.history.CanonicalLocationIdentityService;
+import com.airsense.api.repositories.AqiForecastRunRepository;
 import com.airsense.api.repositories.ForecastModelRegistryRepository;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -20,9 +24,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.argThat;
+import org.mockito.ArgumentCaptor;
 
 class ForecastOrchestratorTest {
 
@@ -322,6 +328,172 @@ class ForecastOrchestratorTest {
                         && req.getCurrentAqi() == null
                         && req.getHistory().isEmpty()
                         && req.getHorizons().equals(List.of(24, 48, 72))));
+    }
+
+    @Test
+    void exactDeployedOpenMeteoResponseIsSelectedAndStoredAsProviderForecast() throws Exception {
+        ForecastOrchestrator orchestrator = orchestrator();
+        MlForecastProperties properties = new MlForecastProperties();
+        properties.setEnabled(true);
+        MlForecastClient client = mock(MlForecastClient.class);
+        AqiForecastRunRepository runRepository = mock(AqiForecastRunRepository.class);
+
+        String deployedAiResponse = """
+                {
+                  "snapshotId": "snap-provider-only-deploy-smoke",
+                  "locationKey": "in:28.614:77.209",
+                  "forecastStandard": "US_AQI",
+                  "generatedAt": "2026-07-29T17:26:40.187376Z",
+                  "predictions": [
+                    {
+                      "status": "FORECAST",
+                      "horizonHours": 24,
+                      "predictedAqi": 151,
+                      "predictedDelta": null,
+                      "unclampedPredictedAqi": null,
+                      "lowerBound": 133,
+                      "upperBound": 169,
+                      "engine": "OPEN_METEO_PROVIDER_FORECAST",
+                      "forecastScope": "COORDINATE_ZERO_SHOT",
+                      "modelScope": "GLOBAL_COORDINATE",
+                      "modelFamily": "PROVIDER_NUMERICAL_FORECAST",
+                      "modelVersion": "open-meteo-air-quality",
+                      "confidence": 0.62,
+                      "confidenceLabel": "MEDIUM",
+                      "baselinePredictedAqi": null,
+                      "validationRmse": null,
+                      "baselineRmse": null,
+                      "fallbackReason": "CHRONOS_DISABLED",
+                      "promotionStatus": "NOT_APPLICABLE",
+                      "aqiStandard": "US_AQI",
+                      "stationName": null,
+                      "stationKey": "in:28.614:77.209",
+                      "stationLocationKey": null,
+                      "snapshotId": "snap-provider-only-deploy-smoke",
+                      "historyObservationCount": 169,
+                      "historyCoverageHours": 168.0,
+                      "featureCoveragePercent": null,
+                      "targetTime": "2026-07-30T17:26:38.023190Z",
+                      "dataOrigin": "OPEN_METEO_PROVIDER_FORECAST:2026-07-30T17:00:00Z",
+                      "trainingDeltaPercentiles": null,
+                      "oodStatus": null,
+                      "oodScore": null,
+                      "oodLevel": null,
+                      "oodFeatures": null,
+                      "warnings": [],
+                      "featureDiagnostics": null,
+                      "modelContributions": null,
+                      "provider": "OPEN_METEO",
+                      "searchedLocationKey": "in:28.614:77.209",
+                      "locationKey": "in:28.614:77.209",
+                      "modelPromotionStatus": "NOT_APPLICABLE"
+                    },
+                    {
+                      "status": "FORECAST",
+                      "horizonHours": 48,
+                      "predictedAqi": 83,
+                      "lowerBound": 65,
+                      "upperBound": 101,
+                      "engine": "OPEN_METEO_PROVIDER_FORECAST",
+                      "forecastScope": "COORDINATE_ZERO_SHOT",
+                      "modelScope": "GLOBAL_COORDINATE",
+                      "modelFamily": "PROVIDER_NUMERICAL_FORECAST",
+                      "modelVersion": "open-meteo-air-quality",
+                      "confidence": 0.55,
+                      "confidenceLabel": "MEDIUM",
+                      "fallbackReason": "CHRONOS_DISABLED",
+                      "promotionStatus": "NOT_APPLICABLE",
+                      "aqiStandard": "US_AQI",
+                      "stationKey": "in:28.614:77.209",
+                      "snapshotId": "snap-provider-only-deploy-smoke",
+                      "historyObservationCount": 169,
+                      "historyCoverageHours": 168.0,
+                      "targetTime": "2026-07-31T17:26:38.023190Z",
+                      "dataOrigin": "OPEN_METEO_PROVIDER_FORECAST:2026-07-31T17:00:00Z",
+                      "warnings": [],
+                      "provider": "OPEN_METEO",
+                      "searchedLocationKey": "in:28.614:77.209",
+                      "locationKey": "in:28.614:77.209",
+                      "modelPromotionStatus": "NOT_APPLICABLE"
+                    },
+                    {
+                      "status": "FORECAST",
+                      "horizonHours": 72,
+                      "predictedAqi": 74,
+                      "lowerBound": 56,
+                      "upperBound": 92,
+                      "engine": "OPEN_METEO_PROVIDER_FORECAST",
+                      "forecastScope": "COORDINATE_ZERO_SHOT",
+                      "modelScope": "GLOBAL_COORDINATE",
+                      "modelFamily": "PROVIDER_NUMERICAL_FORECAST",
+                      "modelVersion": "open-meteo-air-quality",
+                      "confidence": 0.48,
+                      "confidenceLabel": "MEDIUM",
+                      "fallbackReason": "CHRONOS_DISABLED",
+                      "promotionStatus": "NOT_APPLICABLE",
+                      "aqiStandard": "US_AQI",
+                      "stationKey": "in:28.614:77.209",
+                      "snapshotId": "snap-provider-only-deploy-smoke",
+                      "historyObservationCount": 169,
+                      "historyCoverageHours": 168.0,
+                      "targetTime": "2026-08-01T17:26:38.023190Z",
+                      "dataOrigin": "OPEN_METEO_PROVIDER_FORECAST:2026-08-01T17:00:00Z",
+                      "warnings": [],
+                      "provider": "OPEN_METEO",
+                      "searchedLocationKey": "in:28.614:77.209",
+                      "locationKey": "in:28.614:77.209",
+                      "modelPromotionStatus": "NOT_APPLICABLE"
+                    }
+                  ]
+                }
+                """;
+        MlForecastClient.MlForecastResponse response = JsonMapper.builder()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build()
+                .readValue(deployedAiResponse, MlForecastClient.MlForecastResponse.class);
+        when(client.predict(any(MlForecastClient.MlForecastRequest.class))).thenReturn(Optional.of(response));
+        ReflectionTestUtils.setField(orchestrator, "configuredMlProperties", properties);
+        ReflectionTestUtils.setField(orchestrator, "mlForecastClient", client);
+        ReflectionTestUtils.setField(orchestrator, "forecastRunRepository", runRepository);
+
+        ForecastResult result = orchestrator.forecast(
+                baseContext("DELHI", 97, "INDIA_NAQI")
+                        .historicalAQI(historySequence("INDIA_NAQI", 72, 90, 1))
+                        .weather(weatherForecast(2.0, 70, 0.0))
+                        .build(),
+                request("DELHI")
+        );
+
+        assertThat(result.getEngine()).isEqualTo("OPEN_METEO_PROVIDER_FORECAST");
+        assertThat(result.getForecastStandard()).isEqualTo("US_AQI");
+        assertThat(result.isFallbackUsed()).isFalse();
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getMode)
+                .containsExactly("OPEN_METEO_PROVIDER_FORECAST", "OPEN_METEO_PROVIDER_FORECAST", "OPEN_METEO_PROVIDER_FORECAST");
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getFallbackReason)
+                .containsExactly("CHRONOS_DISABLED", "CHRONOS_DISABLED", "CHRONOS_DISABLED");
+
+        ArgumentCaptor<AqiForecastRun> savedRun = ArgumentCaptor.forClass(AqiForecastRun.class);
+        verify(runRepository, times(3)).save(savedRun.capture());
+        assertThat(savedRun.getAllValues())
+                .extracting(AqiForecastRun::getEngine)
+                .containsOnly("OPEN_METEO_PROVIDER_FORECAST");
+        assertThat(savedRun.getAllValues())
+                .extracting(AqiForecastRun::getForecastStandard)
+                .containsOnly("US_AQI");
+        assertThat(savedRun.getAllValues())
+                .extracting(AqiForecastRun::getFallbackReason)
+                .containsOnly("CHRONOS_DISABLED");
+        verify(client).predict(argThat(req ->
+                "US_AQI".equals(req.getForecastStandard())
+                        && "US_AQI".equals(req.getAqiStandard())
+                        && "OPEN_METEO".equals(req.getProvider())
+                        && req.getCurrentAqi() == null
+                        && req.getHistory().isEmpty()
+                        && req.getHorizons().equals(List.of(24, 48, 72))
+                        && Double.valueOf(28.6).equals(req.getLatitude())
+                        && Double.valueOf(77.2).equals(req.getLongitude())));
     }
 
     @Test

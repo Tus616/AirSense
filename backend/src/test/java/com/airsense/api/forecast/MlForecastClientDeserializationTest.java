@@ -3,6 +3,7 @@ package com.airsense.api.forecast;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,5 +54,14 @@ class MlForecastClientDeserializationTest {
         assertThat(prediction.getFallbackReason()).isEqualTo("CHRONOS_DISABLED");
         assertThat(prediction.getPredictedAqi()).isEqualTo(156);
         assertThat(prediction.getTargetTime()).isEqualTo("2026-07-30T00:00:00Z");
+    }
+
+    @Test
+    void providerForecastClientUsesColdStartSafeTimeoutFloor() {
+        MlForecastProperties properties = new MlForecastProperties();
+        properties.setTimeoutSeconds(5);
+        MlForecastClient client = new MlForecastClient(new RestTemplateBuilder(), properties);
+
+        assertThat(client.effectiveTimeoutSeconds()).isEqualTo(90);
     }
 }
