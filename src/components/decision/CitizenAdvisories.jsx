@@ -28,7 +28,7 @@ export default function CitizenAdvisories({ advisoryResult }) {
               <h3>{toDisplayText(advisory.title, "Health advisory")}</h3>
               <p>{toDisplayText(advisory.message, "No advisory message returned.")}</p>
               <div className="decision-advisory-card__risk">
-                {labelize(advisory.exposureRisk)} risk · {formatPercent(advisory.confidence)}
+                {labelize(advisory.exposureRisk)} risk - {formatPercent(advisory.confidence)}
               </div>
               <ul>
                 {asArray(advisory.recommendedActions).slice(0, 3).map((action, index) => (

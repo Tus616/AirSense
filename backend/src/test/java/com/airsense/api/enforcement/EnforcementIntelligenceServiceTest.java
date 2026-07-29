@@ -70,6 +70,51 @@ class EnforcementIntelligenceServiceTest {
     }
 
     @Test
+    void providerForecastWithNotApplicablePromotionProducesRecommendations() {
+        ForecastResult forecast = forecast("DELHI", 205, "worsening", 0.62);
+        forecast.setEngine("OPEN_METEO_PROVIDER_FORECAST");
+        forecast.setSnapshotId("snap-provider");
+        forecast.getForecast().values().forEach(point -> {
+            point.setEngine("OPEN_METEO_PROVIDER_FORECAST");
+            point.setMode("OPEN_METEO_PROVIDER_FORECAST");
+            point.setModelPromotionStatus("NOT_APPLICABLE");
+        });
+
+        EnforcementResult result = service.recommend(
+                context("DELHI", 158).build(),
+                attribution("DELHI", PollutionSourceType.REGIONAL_TRANSPORT, 0.48),
+                forecast,
+                request("DELHI")
+        );
+
+        assertThat(result.getRecommendations()).isNotEmpty();
+        assertThat(result.getRecommendations())
+                .allSatisfy(rec -> {
+                    assertThat(rec.getForecastEngine()).isEqualTo("OPEN_METEO_PROVIDER_FORECAST");
+                    assertThat(rec.getSnapshotId()).isEqualTo("snap-provider");
+                    assertThat(rec.getActionWindow()).isNotBlank();
+                    assertThat(rec.getRecommendedActions()).isNotEmpty();
+                    assertThat(rec.getSupportingEvidence()).isNotNull();
+                });
+    }
+
+    @Test
+    void lowAttributionConfidenceAddsCautionLimitation() {
+        ForecastResult forecast = forecast("PUNE", 212, "worsening", 0.58);
+        EnforcementResult result = service.recommend(
+                context("PUNE", 188).build(),
+                attribution("PUNE", PollutionSourceType.UNKNOWN, 0.18),
+                forecast,
+                request("PUNE")
+        );
+
+        assertThat(result.getRecommendations()).isNotEmpty();
+        assertThat(result.getRecommendations())
+                .anySatisfy(rec -> assertThat(rec.getLimitations())
+                        .anyMatch(value -> value.contains("Low attribution confidence")));
+    }
+
+    @Test
     void highForecastWorseningAddsHealthAndSchoolActions() {
         EnforcementResult result = service.recommend(
                 context("DELHI", 180)

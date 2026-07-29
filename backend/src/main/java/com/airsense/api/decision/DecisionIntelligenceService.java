@@ -96,6 +96,7 @@ public class DecisionIntelligenceService {
                 .cityId(valueOrDefault(safeContext.getCityId(), safeRequest.getCityId()))
                 .generatedAt(Instant.now())
                 .snapshotId(snapshotId(safeContext, safeAttribution))
+                .sharedSnapshot(sharedSnapshot(safeContext, safeForecast, safeAttribution, safeRequest))
                 .locationKey(safeAttribution.getLocationKey())
                 .snapshotObservedAt(safeAttribution.getSnapshotObservedAt())
                 .snapshotGeneratedAt(safeAttribution.getSnapshotGeneratedAt())
@@ -485,6 +486,40 @@ public class DecisionIntelligenceService {
         return signals;
     }
 
+    private SharedDecisionSnapshot sharedSnapshot(CityEnvironmentalContext context, ForecastResult forecast,
+                                                  AttributionResult attribution, DecisionRequest request) {
+        Map<String, Object> aqi = safeMap(context.getAqi());
+        Map<String, Object> selected = asStringObjectMap(aqi.get("selected"));
+        Map<String, Object> coordinates = safeMap(context.getCoordinates());
+        Map<String, Object> pollutants = asStringObjectMap(aqi.get("pollutants"));
+        if (pollutants.isEmpty()) {
+            pollutants = asStringObjectMap(selected.get("pollutants"));
+        }
+        if (pollutants.isEmpty()) {
+            Object fallbackPollutants = environmentalSignals(context).get("pollutants");
+            pollutants = asStringObjectMap(fallbackPollutants);
+        }
+        String currentStandard = valueOrDefault(text(first(selected, "standard", "aqiStandard")),
+                valueOrDefault(text(first(aqi, "standard", "aqiStandard")), ""));
+        return SharedDecisionSnapshot.builder()
+                .snapshotId(snapshotId(context, attribution))
+                .searchedLocationKey(valueOrDefault(attribution != null ? attribution.getLocationKey() : null, locationHash(context, attribution)))
+                .latitude(firstPositive(number(coordinates.get("latitude")), request.getLatitude() != null ? request.getLatitude() : 0.0))
+                .longitude(firstPositive(number(coordinates.get("longitude")), request.getLongitude() != null ? request.getLongitude() : 0.0))
+                .stationKey(text(first(aqi, "stationKey")))
+                .stationLocationKey(valueOrDefault(text(first(aqi, "stationLocationKey")), forecast != null ? forecast.getStationLocationKey() : ""))
+                .stationName(valueOrDefault(text(first(aqi, "stationName")), forecast != null ? forecast.getStationName() : ""))
+                .currentAqi(canonicalCurrentAqi(context))
+                .currentAqiStandard(currentStandard)
+                .currentProvider(valueOrDefault(text(first(selected, "provider")), valueOrDefault(text(first(aqi, "provider")), forecast != null ? forecast.getCurrentProvider() : "")))
+                .forecastStandard(forecast != null ? forecast.getForecastStandard() : currentStandard)
+                .pollutants(new LinkedHashMap<>(pollutants))
+                .weather(context.getWeather() != null ? new LinkedHashMap<>(context.getWeather()) : new LinkedHashMap<>())
+                .observedAt(first(aqi, "observedAt", "timestamp", "lastUpdated", "latestTimestamp", "fetchedAt"))
+                .generatedAt(context.getTimestamp() != null ? context.getTimestamp() : Instant.now())
+                .build();
+    }
+
     private double overallConfidence(EvidenceBundle evidence, EngineStatus status) {
         double average = evidence.getConfidenceScores().values().stream()
                 .mapToDouble(Double::doubleValue)
@@ -708,6 +743,19 @@ public class DecisionIntelligenceService {
             }
         }
         return 0.0;
+    }
+
+    private Object first(Map<String, Object> map, String... keys) {
+        if (map == null) return null;
+        for (String key : keys) {
+            Object value = map.get(key);
+            if (value != null && !String.valueOf(value).isBlank()) return value;
+        }
+        return null;
+    }
+
+    private String text(Object value) {
+        return value != null ? String.valueOf(value) : "";
     }
 
     private Map<String, Object> safeMap(Map<String, Object> value) {

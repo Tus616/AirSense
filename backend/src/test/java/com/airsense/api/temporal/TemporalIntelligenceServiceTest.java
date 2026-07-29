@@ -8,6 +8,7 @@ import com.airsense.api.decision.DecisionRequest;
 import com.airsense.api.decision.DecisionSummary;
 import com.airsense.api.decision.PriorityAction;
 import com.airsense.api.decision.RiskAssessment;
+import com.airsense.api.decision.SharedDecisionSnapshot;
 import com.airsense.api.forecast.ForecastPoint;
 import com.airsense.api.forecast.ForecastResult;
 import com.airsense.api.geospatial.GeoSpatialIntelligenceResult;
@@ -143,6 +144,21 @@ class TemporalIntelligenceServiceTest {
         assertThat(plus72.getDecision().getSummary().getWhatIsHappening()).contains("+72h frame AQI is 290");
     }
 
+    @Test
+    void framesPreserveSharedSnapshotAndForecastProvenance() {
+        TemporalIntelligenceService service = service();
+
+        TimelineFrame plus24 = service.timeline(TemporalRequest.builder().cityId("DELHI").build()).getFrames().get(2);
+
+        assertThat(plus24.getDecision().getSnapshotId()).isEqualTo("snap-test-DELHI");
+        assertThat(plus24.getDecision().getLocationHash()).isEqualTo("hash-test");
+        assertThat(plus24.getDecision().getSharedSnapshot().getCurrentProvider()).isEqualTo("CPCB_CAAQMS");
+        assertThat(plus24.getForecast().getEngine()).isEqualTo("OPEN_METEO_PROVIDER_FORECAST");
+        assertThat(plus24.getForecast().getForecastStandard()).isEqualTo("US_AQI");
+        assertThat(plus24.getForecast().getCurrentProvider()).isEqualTo("CPCB_CAAQMS");
+        assertThat(plus24.getForecast().getStationLocationKey()).isEqualTo("provider:station:ITO");
+    }
+
     private TemporalIntelligenceService service() {
         DecisionIntelligenceService decisionService = Mockito.mock(DecisionIntelligenceService.class);
         GeoSpatialIntelligenceService geoSpatialService = Mockito.mock(GeoSpatialIntelligenceService.class);
@@ -160,6 +176,22 @@ class TemporalIntelligenceServiceTest {
                 .city("Delhi")
                 .cityId("DELHI")
                 .generatedAt(Instant.parse("2026-07-10T00:00:00Z"))
+                .snapshotId("snap-test-DELHI")
+                .sharedSnapshot(SharedDecisionSnapshot.builder()
+                        .snapshotId("snap-test-DELHI")
+                        .searchedLocationKey("DELHI")
+                        .stationLocationKey("provider:station:ITO")
+                        .stationName("ITO, Delhi - CPCB")
+                        .currentAqi(210)
+                        .currentAqiStandard("INDIA_NAQI")
+                        .currentProvider("CPCB_CAAQMS")
+                        .forecastStandard("US_AQI")
+                        .build())
+                .locationKey("provider:station:ITO")
+                .snapshotObservedAt("2026-07-10T00:00:00Z")
+                .snapshotGeneratedAt(Instant.parse("2026-07-10T00:00:00Z"))
+                .snapshotReused(false)
+                .locationHash("hash-test")
                 .currentAQI(210)
                 .overallConfidence(0.74)
                 .summary(DecisionSummary.builder()
@@ -178,6 +210,16 @@ class TemporalIntelligenceServiceTest {
                         .overallRiskLevel("HIGH")
                         .build())
                 .forecast(ForecastResult.builder()
+                        .cityId("DELHI")
+                        .snapshotId("snap-test-DELHI")
+                        .locationHash("hash-test")
+                        .currentAqi(210)
+                        .forecastStandard("US_AQI")
+                        .currentProvider("CPCB_CAAQMS")
+                        .engine("OPEN_METEO_PROVIDER_FORECAST")
+                        .stationKey("station-ito")
+                        .stationName("ITO, Delhi - CPCB")
+                        .stationLocationKey("provider:station:ITO")
                         .overallConfidence(0.72)
                         .overallTrend("worsening")
                         .forecast(Map.of(

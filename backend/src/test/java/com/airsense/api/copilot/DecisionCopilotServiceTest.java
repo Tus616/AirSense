@@ -15,6 +15,7 @@ import com.airsense.api.decision.DecisionSummary;
 import com.airsense.api.decision.EngineStatus;
 import com.airsense.api.decision.EvidenceBundle;
 import com.airsense.api.decision.RiskAssessment;
+import com.airsense.api.decision.SharedDecisionSnapshot;
 import com.airsense.api.enforcement.EnforcementActionType;
 import com.airsense.api.enforcement.EnforcementRecommendation;
 import com.airsense.api.enforcement.EnforcementResult;
@@ -65,6 +66,40 @@ class DecisionCopilotServiceTest {
         assertThat(response.getIntent()).isEqualTo(CopilotIntent.EXPLAIN_FORECAST);
         assertThat(response.getAnswer()).contains("24 hours").contains("AQI 312");
         assertThat(response.getCitations()).anyMatch(c -> c.getSourceType().equals("FORECAST") && c.getValue().contains("312"));
+    }
+
+    @Test
+    void providerForecastResponseUsesSharedSnapshotGrounding() {
+        DecisionIntelligenceResult decision = decision(false, false);
+        decision.setSharedSnapshot(SharedDecisionSnapshot.builder()
+                .snapshotId("snap-test-DELHI")
+                .searchedLocationKey("DELHI")
+                .stationLocationKey("provider:station:ITO")
+                .stationName("ITO, Delhi - CPCB")
+                .currentAqi(270)
+                .currentAqiStandard("INDIA_NAQI")
+                .currentProvider("CPCB_CAAQMS")
+                .forecastStandard("US_AQI")
+                .observedAt("2026-07-19T10:30:00Z")
+                .build());
+        decision.getForecast().setEngine("OPEN_METEO_PROVIDER_FORECAST");
+        decision.getForecast().setMode("OPEN_METEO_PROVIDER_FORECAST");
+        decision.getForecast().setForecastStandard("US_AQI");
+        decision.getForecast().getForecast().values().forEach(point -> {
+            point.setEngine("OPEN_METEO_PROVIDER_FORECAST");
+            point.setMode("OPEN_METEO_PROVIDER_FORECAST");
+        });
+        decisionService.result = decision;
+
+        CopilotResponse response = service.answer(request("What will happen next 24h?", "+24h"));
+
+        assertThat(response.getAnswer()).contains("atmospheric provider forecast");
+        assertThat(response.getCitations()).anyMatch(citation -> citation.getLabel().equals("Forecast engine")
+                && citation.getValue().equals("Atmospheric Provider Forecast"));
+        assertThat(response.getGrounding()).containsEntry("sharedSnapshotId", "snap-test-DELHI");
+        assertThat(response.getGrounding()).containsEntry("provider", "CPCB_CAAQMS");
+        assertThat(response.getGrounding()).containsEntry("forecastStandard", "US_AQI");
+        assertThat(response.getGrounding()).containsEntry("forecastEngine", "Atmospheric Provider Forecast");
     }
 
     @Test

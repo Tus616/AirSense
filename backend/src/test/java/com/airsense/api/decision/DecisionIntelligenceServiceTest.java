@@ -114,6 +114,34 @@ class DecisionIntelligenceServiceTest {
     }
 
     @Test
+    void decisionResponseIncludesSharedSnapshotForDependentModules() {
+        CityEnvironmentalContext context = context("DELHI", 127);
+        ForecastResult forecast = forecast("DELHI", 158, "worsening", 0.62, false);
+        forecast.setForecastStandard("US_AQI");
+        forecast.setCurrentProvider("IQAIR");
+        forecast.setStationLocationKey("in:28.614:77.209");
+
+        DecisionIntelligenceResult result = assemble(
+                context,
+                attribution("DELHI", PollutionSourceType.REGIONAL_TRANSPORT, 0.62),
+                forecast,
+                enforcement("DELHI", 127, 158, PollutionSourceType.REGIONAL_TRANSPORT, 61),
+                advisory("DELHI", 127, 158, PollutionSourceType.REGIONAL_TRANSPORT, AdvisorySeverity.MODERATE, 0.65)
+        );
+
+        assertThat(result.getSharedSnapshot()).isNotNull();
+        assertThat(result.getSharedSnapshot().getSnapshotId()).isEqualTo("snap-test-DELHI");
+        assertThat(result.getSharedSnapshot().getCurrentAqi()).isEqualTo(127);
+        assertThat(result.getSharedSnapshot().getCurrentAqiStandard()).isEqualTo("INDIA_NAQI");
+        assertThat(result.getSharedSnapshot().getCurrentProvider()).isEqualTo("CPCB_CAAQMS");
+        assertThat(result.getSharedSnapshot().getForecastStandard()).isEqualTo("US_AQI");
+        assertThat(result.getSharedSnapshot().getPollutants()).containsKey("aqi");
+        assertThat(result.getForecast().getSnapshotId()).isEqualTo(result.getSharedSnapshot().getSnapshotId());
+        assertThat(result.getEnforcement().getSnapshotId()).isEqualTo(result.getSharedSnapshot().getSnapshotId());
+        assertThat(result.getAdvisories().getSnapshotId()).isEqualTo(result.getSharedSnapshot().getSnapshotId());
+    }
+
+    @Test
     void attributionLowConfidenceMarksDegradedMode() {
         DecisionIntelligenceResult result = assemble(
                 context("KOCHI", 132),
@@ -221,6 +249,7 @@ class DecisionIntelligenceServiceTest {
                 .aqi(Map.of(
                         "available", true,
                         "currentAqi", currentAqi,
+                        "pollutants", Map.of("aqi", currentAqi, "pm25", 58, "pm10", 82),
                         "selected", Map.of("currentAqi", currentAqi, "standard", "INDIA_NAQI", "provider", "CPCB_CAAQMS")
                 ))
                 .population(Map.of("population", 10_000_000, "schoolsCount", 6, "hospitalsCount", 3))
@@ -236,6 +265,8 @@ class DecisionIntelligenceServiceTest {
                 .cityId(cityId)
                 .wardId("WARD-1")
                 .timestamp(Instant.now())
+                .snapshotId("snap-test-" + cityId)
+                .locationHash("loc-test-" + cityId)
                 .dominantSource(source)
                 .overallConfidence(confidence)
                 .explanation("Dominant source is " + source)
@@ -253,6 +284,8 @@ class DecisionIntelligenceServiceTest {
                 .cityId(cityId)
                 .wardId("WARD-1")
                 .generatedAt(Instant.now())
+                .snapshotId("snap-test-" + cityId)
+                .locationHash("loc-test-" + cityId)
                 .overallConfidence(confidence)
                 .overallTrend(trend)
                 .fallbackUsed(fallback)
@@ -274,6 +307,8 @@ class DecisionIntelligenceServiceTest {
                 .currentAqi(currentAqi)
                 .forecastPeakAqi(peakAqi)
                 .dominantSource(source.name())
+                .snapshotId("snap-test-" + cityId)
+                .locationHash("loc-test-" + cityId)
                 .recommendations(List.of(EnforcementRecommendation.builder()
                         .actionType(source == PollutionSourceType.TRAFFIC ? EnforcementActionType.TRAFFIC_DIVERSION : EnforcementActionType.PUBLIC_ADVISORY)
                         .responsibleAgency(source == PollutionSourceType.TRAFFIC ? "Traffic Police" : "Municipal Corporation")
@@ -296,6 +331,7 @@ class DecisionIntelligenceServiceTest {
                 .currentAqi(currentAqi)
                 .forecastPeakAqi(peakAqi)
                 .dominantSource(source.name())
+                .snapshotId("snap-test-" + cityId)
                 .overallSeverity(severity)
                 .overallExposureRisk(ExposureRisk.UNHEALTHY)
                 .advisories(List.of(HealthAdvisory.builder()

@@ -56,7 +56,7 @@ export default function AttributionPanel({ attribution, activeDominantSource }) 
               <div className="decision-source-row__main">
                 <div>
                   <strong>{toDisplayText(source.displayName, labelize(source.sourceType))}</strong>
-                  <span>{formatPercent(source.confidence)} confidence{source.confidenceLabel ? ` · ${labelize(source.confidenceLabel)}` : ""}</span>
+                  <span>{formatPercent(source.confidence)} confidence{source.confidenceLabel ? ` - ${labelize(source.confidenceLabel)}` : ""}</span>
                 </div>
                 <b>{percent == null || Number.isNaN(percent) ? "Unavailable" : `${Math.round(percent)}%`}</b>
               </div>

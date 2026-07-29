@@ -43,6 +43,14 @@ class GeoSpatialIntelligenceServiceTest {
     }
 
     @Test
+    void everyLayerDeclaresAllowedDataOrigin() {
+        GeoSpatialIntelligenceResult result = service().assemble(context(false), attribution(), forecast(), enforcement(), advisory(), decision());
+
+        assertThat(result.getLayers()).allSatisfy(layer -> assertThat(layer.getMetadata().get("dataOrigin"))
+                .isIn("OBSERVED", "DERIVED_FROM_REAL_DATA", "FORECAST", "UNAVAILABLE"));
+    }
+
+    @Test
     void everyLayerReturnsValidFeatureCollection() {
         GeoSpatialIntelligenceResult result = service().assemble(context(false), attribution(), forecast(), enforcement(), advisory(), decision());
 

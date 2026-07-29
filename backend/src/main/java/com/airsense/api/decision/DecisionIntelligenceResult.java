@@ -26,6 +26,7 @@ public class DecisionIntelligenceResult {
     private String cityId;
     private Instant generatedAt;
     private String snapshotId;
+    private SharedDecisionSnapshot sharedSnapshot;
     private String locationKey;
     private Object snapshotObservedAt;
     private Object snapshotGeneratedAt;

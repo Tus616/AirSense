@@ -12,6 +12,7 @@ import com.airsense.api.enforcement.EnforcementEvidence;
 import com.airsense.api.enforcement.EnforcementRecommendation;
 import com.airsense.api.forecast.ForecastExplanation;
 import com.airsense.api.forecast.ForecastPoint;
+import com.airsense.api.forecast.ForecastResult;
 import com.airsense.api.geospatial.GeoSpatialSummary;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -133,9 +134,10 @@ public class ExplainabilityService {
             }
         }
         if (decision.getForecast() != null && decision.getForecast().getForecast() != null) {
+            String forecastProvider = forecastLabel(forecastEngine(decision));
             decision.getForecast().getForecast().entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
-                    .forEach(entry -> addForecastEvidence(evidence, entry.getKey(), entry.getValue(), timestamp));
+                    .forEach(entry -> addForecastEvidence(evidence, entry.getKey(), entry.getValue(), timestamp, forecastProvider));
         }
         if (decision.getEnforcement() != null && decision.getEnforcement().getRecommendations() != null) {
             for (EnforcementRecommendation recommendation : decision.getEnforcement().getRecommendations()) {
@@ -172,24 +174,24 @@ public class ExplainabilityService {
                 .toList();
     }
 
-    private void addForecastEvidence(List<EvidenceItem> evidence, String horizon, ForecastPoint point, Instant timestamp) {
+    private void addForecastEvidence(List<EvidenceItem> evidence, String horizon, ForecastPoint point, Instant timestamp, String provider) {
         if (point == null) return;
         if (point.getPredictedAqi() == null) {
             evidence.add(item("forecast", horizon + " predicted AQI unavailable", 0.20, point.getConfidence(),
-                    "Forecast Engine", timestamp));
+                    provider, timestamp));
             return;
         }
         evidence.add(item("forecast", horizon + " predicted AQI " + point.getPredictedAqi(), 0.65, point.getConfidence(),
-                "Forecast Engine", timestamp));
+                provider, timestamp));
         ForecastExplanation explanation = point.getExplanation();
         if (explanation != null) {
             if (explanation.getReasons() != null) {
                 for (String reason : explanation.getReasons()) {
-                    evidence.add(item("forecast", horizon + ": " + reason, 0.50, point.getConfidence(), "Forecast Engine", timestamp));
+                    evidence.add(item("forecast", horizon + ": " + reason, 0.50, point.getConfidence(), provider, timestamp));
                 }
             }
             if (explanation.getFallbackReason() != null && !explanation.getFallbackReason().isBlank()) {
-                evidence.add(item("forecast", "Fallback reason: " + explanation.getFallbackReason(), 0.35, point.getConfidence(), "Forecast Engine", timestamp));
+                evidence.add(item("forecast", "Fallback reason: " + explanation.getFallbackReason(), 0.35, point.getConfidence(), provider, timestamp));
             }
         }
     }
@@ -202,7 +204,7 @@ public class ExplainabilityService {
         }
         ForecastPoint peak = peakForecast(decision);
         if (peak != null && peak.getPredictedAqi() != null) {
-            steps.add(step(order++, "Forecast", "Forecast predicts AQI " + peak.getPredictedAqi() + " over " + peak.getHorizonHours() + "h", confidence.getForecast(), List.of("forecast", "weather", "aqi")));
+            steps.add(step(order++, "Forecast", forecastLabel(forecastEngine(decision)) + " predicts AQI " + peak.getPredictedAqi() + " over " + peak.getHorizonHours() + "h", confidence.getForecast(), List.of("forecast", "weather", "aqi")));
         }
         if (decision.getAttribution() != null && decision.getAttribution().getDominantSource() != null) {
             steps.add(step(order++, "Attribution", "Dominant pollution source = " + decision.getAttribution().getDominantSource(), confidence.getAttribution(), List.of("attribution", "aqi")));
@@ -238,15 +240,17 @@ public class ExplainabilityService {
         if (decision.getForecast() != null) {
             boolean forecastUnavailable = "UNAVAILABLE".equalsIgnoreCase(decision.getForecast().getMode())
                     || "UNAVAILABLE".equalsIgnoreCase(decision.getForecast().getModelVersion());
+            String engine = forecastEngine(decision);
             explanations.add(ModelExplanation.builder()
-                    .modelName("Forecast Engine")
+                    .modelName(forecastLabel(engine))
                     .outputType("AQI forecast")
-                    .inputSignals(List.of("current AQI", "historical AQI", "weather", "attribution"))
-                    .rulesFired(forecastUnavailable ? List.of("forecast_unavailable_no_model_output")
-                            : decision.getForecast().isFallbackUsed() ? List.of("forecast_fallback_used") : List.of("model_prediction_used"))
+                    .inputSignals(forecastInputs(engine))
+                    .rulesFired(forecastRules(decision, engine, forecastUnavailable))
                     .confidence(confidence.getForecast())
                     .explanation(forecastUnavailable
                             ? "Forecast unavailable until a genuinely trained and evaluated model exists."
+                            : isOpenMeteoProvider(engine)
+                            ? "Atmospheric provider forecast from Open-Meteo; not a locally trained/promoted ML model."
                             : "Forecast trend: " + value(decision.getForecast().getOverallTrend(), "unknown"))
                     .build());
         }
@@ -309,6 +313,8 @@ public class ExplainabilityService {
             limitations.add("Forecast is unavailable until a genuinely trained and evaluated model exists.");
         } else if (decision.getForecast() != null && decision.getForecast().isFallbackUsed()) {
             limitations.add("Forecast engine used fallback mode, so forecast confidence is reduced.");
+        } else if (isOpenMeteoProvider(forecastEngine(decision))) {
+            limitations.add("Forecast is an atmospheric provider forecast, not a locally trained/promoted model.");
         }
         if (decision.getEngineStatus() != null && decision.getEngineStatus().isDegradedMode()) {
             limitations.add("Decision response is in degraded mode.");
@@ -333,7 +339,7 @@ public class ExplainabilityService {
         }
         ForecastPoint peak = peakForecast(decision);
         if (peak != null && peak.getPredictedAqi() != null) {
-            parts.add("The forecast peak is " + peak.getPredictedAqi() + " AQI at the " + peak.getHorizonHours() + " hour horizon.");
+            parts.add("The " + forecastLabel(forecastEngine(decision)).toLowerCase() + " peak is " + peak.getPredictedAqi() + " AQI at the " + peak.getHorizonHours() + " hour horizon.");
         }
         if (decision.getPriorityActions() != null && !decision.getPriorityActions().isEmpty()) {
             parts.add("Recommended actions include " + decision.getPriorityActions().stream()
@@ -367,6 +373,54 @@ public class ExplainabilityService {
                 .max(Comparator.comparingInt(ForecastPoint::getPredictedAqi))
                 .orElse(null)
                 : null;
+    }
+
+    private String forecastEngine(DecisionIntelligenceResult decision) {
+        ForecastResult forecast = decision != null ? decision.getForecast() : null;
+        ForecastPoint peak = peakForecast(decision);
+        return firstText(
+                peak != null ? peak.getEngine() : null,
+                peak != null ? peak.getMode() : null,
+                forecast != null ? forecast.getEngine() : null,
+                forecast != null ? forecast.getMode() : null,
+                forecast != null ? forecast.getModelVersion() : null,
+                "Forecast Engine");
+    }
+
+    private String forecastLabel(String engine) {
+        String normalized = engine != null ? engine.toUpperCase() : "";
+        if (normalized.contains("OPEN_METEO_PROVIDER_FORECAST")) return "Atmospheric Provider Forecast";
+        if (normalized.contains("CHRONOS_BOLT_ZERO_SHOT")) return "Pretrained AI Forecast";
+        if (normalized.contains("PERSISTENCE_FALLBACK")) return "Persistence Forecast Fallback";
+        if (normalized.contains("UNAVAILABLE")) return "Forecast Unavailable";
+        return "Forecast Engine";
+    }
+
+    private List<String> forecastInputs(String engine) {
+        if (isOpenMeteoProvider(engine)) {
+            return List.of("current AQI", "provider AQI forecast", "weather", "location");
+        }
+        return List.of("current AQI", "historical AQI", "weather", "attribution");
+    }
+
+    private List<String> forecastRules(DecisionIntelligenceResult decision, String engine, boolean unavailable) {
+        if (unavailable) return List.of("forecast_unavailable_no_model_output");
+        if (decision.getForecast().isFallbackUsed()) return List.of("forecast_fallback_used");
+        if (isOpenMeteoProvider(engine)) return List.of("provider_forecast_used");
+        if (engine != null && engine.toUpperCase().contains("CHRONOS_BOLT_ZERO_SHOT")) return List.of("pretrained_forecast_used");
+        return List.of("model_prediction_used");
+    }
+
+    private boolean isOpenMeteoProvider(String engine) {
+        return engine != null && engine.toUpperCase().contains("OPEN_METEO_PROVIDER_FORECAST");
+    }
+
+    private String firstText(Object... values) {
+        if (values == null) return "";
+        for (Object value : values) {
+            if (value != null && !String.valueOf(value).isBlank()) return String.valueOf(value);
+        }
+        return "";
     }
 
     private List<PollutionSourceContribution> topSources(DecisionIntelligenceResult decision) {

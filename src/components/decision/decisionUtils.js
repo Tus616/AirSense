@@ -57,6 +57,7 @@ export function toDisplayText(value, fallback = "Unavailable") {
 }
 
 export function formatPercent(value) {
+  if (value === null || value === undefined || value === "") return "Unavailable";
   return `${Math.round(asNumber(value) * 100)}%`;
 }
 
@@ -110,6 +111,7 @@ export function getAqiTone(aqi) {
 }
 
 export function getForecastPoints(forecastResult) {
+  if (!forecastResult) return [];
   if (Array.isArray(forecastResult?.forecasts) && forecastResult.forecasts.length > 0) {
     return forecastResult.forecasts.map((point) => ({
       key: `${point.horizonHours || ""}h`,

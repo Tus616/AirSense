@@ -331,7 +331,7 @@ public class PollutionSourceAttributionEngine {
                 .snapshotGeneratedAt(input.getSnapshotGeneratedAt())
                 .snapshotReused(input.getSnapshotReused())
                 .locationHash(input.getLocationHash())
-                .sources(List.of())
+                .sources(List.of(unknownContribution(100, generatedAt)))
                 .dominantSource(PollutionSourceType.UNKNOWN)
                 .overallConfidence(0.0)
                 .overallConfidenceLabel(AttributionConfidenceLabel.INSUFFICIENT_EVIDENCE.name())

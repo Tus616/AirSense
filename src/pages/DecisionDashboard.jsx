@@ -229,6 +229,9 @@ function advisoryGuidance(item) {
 function actionDetailText(item) {
   const detail = item?.description || item?.reason || item?.status || item?.message;
   if (detail) return toDisplayText(detail);
+  if (asArray(item?.recommendedActions).length > 0) {
+    return asArray(item.recommendedActions).map((action) => toDisplayText(action)).join("; ");
+  }
   if (item?.evidence || item?.technicalEvidence || item?.supportingEvidence) {
     return "Technical evidence is available in the relevant detail view.";
   }
@@ -1706,7 +1709,8 @@ function SourceAttributionCard({ attribution, compact = false }) {
 }
 
 function SourceRow({ source, compact }) {
-  const percent = Number(source?.estimatedContributionPercent ?? source?.percentage ?? source?.contributionPercent);
+  const rawPercent = source?.estimatedContributionPercent ?? source?.percentage ?? source?.contributionPercent;
+  const percent = rawPercent === null || rawPercent === undefined || rawPercent === "" ? null : Number(rawPercent);
   const safePercent = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
   const evidence = asArray(source.supportingEvidence || source.evidence);
   return (
@@ -1768,8 +1772,11 @@ function ActionList({ items, empty, compact = false }) {
     <div className={`uqi-action-list ${compact ? "is-compact" : ""}`}>
       {rows.map((item, index) => (
         <article className="uqi-action-item" key={`${toDisplayText(item)}-${index}`}>
-          <strong>{toDisplayText(item.title || item.action || item.name || item, `Item ${index + 1}`)}</strong>
+          <strong>{toDisplayText(item.title || item.actionType || item.action || item.name || item, `Item ${index + 1}`)}</strong>
           <span>{actionDetailText(item)}</span>
+          {asArray(item?.limitations).length > 0 ? (
+            <small>{asArray(item.limitations).map((limitation) => toDisplayText(limitation)).join("; ")}</small>
+          ) : null}
         </article>
       ))}
     </div>

@@ -20,7 +20,7 @@ export default function EnforcementActions({ enforcement, priorityActions }) {
           {recommendations.map((item) => (
             <article key={item.recommendationId || item.actionType} className="decision-action-card">
               <div className="decision-action-card__score">
-                <strong>{formatScore(item.priorityScore)}</strong>
+                <strong>{formatScore(item.priorityScore ?? item.priority)}</strong>
                 <span>{labelize(item.priorityLevel, "Priority")}</span>
               </div>
               <div className="decision-action-card__body">
@@ -32,16 +32,34 @@ export default function EnforcementActions({ enforcement, priorityActions }) {
                 <div className="decision-meta-grid">
                   <span>Agency</span>
                   <strong>{item.responsibleAgency || "Unassigned"}</strong>
-                  <span>Ward</span>
-                  <strong>{item.wardId || "Citywide"}</strong>
+                  <span>Target</span>
+                  <strong>{toDisplayText(item.targetArea || item.wardId, "Citywide")}</strong>
                   <span>Urgency</span>
                   <strong>{labelize(item.urgency)}</strong>
+                  <span>Window</span>
+                  <strong>{toDisplayText(item.actionWindow, "Unspecified")}</strong>
+                  <span>Forecast</span>
+                  <strong>{labelize(item.forecastEngine, "Unavailable")}</strong>
                 </div>
                 <div className="decision-tag-row">
                   {asArray(item.datasetsUsed).map((dataset) => (
                     <span key={dataset}>{labelize(dataset)}</span>
                   ))}
+                  {item.snapshotId ? <span>Snapshot {toDisplayText(item.snapshotId)}</span> : null}
+                  <span>{asArray(item.supportingEvidence || item.evidence).length} evidence</span>
                 </div>
+                {asArray(item.recommendedActions).length > 0 ? (
+                  <ul className="decision-evidence-list">
+                    {asArray(item.recommendedActions).slice(0, 3).map((action, index) => (
+                      <li key={`${toDisplayText(action, "action")}-${index}`}>{toDisplayText(action, "Recommended action unavailable")}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {asArray(item.limitations).length > 0 ? (
+                  <p className="decision-panel__note">
+                    Limitations: {asArray(item.limitations).map((limitation) => toDisplayText(limitation)).join("; ")}
+                  </p>
+                ) : null}
               </div>
             </article>
           ))}

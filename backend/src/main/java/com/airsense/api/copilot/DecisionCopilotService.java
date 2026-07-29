@@ -5,6 +5,7 @@ import com.airsense.api.attribution.PollutionSourceContribution;
 import com.airsense.api.decision.DecisionIntelligenceResult;
 import com.airsense.api.decision.DecisionIntelligenceService;
 import com.airsense.api.decision.DecisionRequest;
+import com.airsense.api.decision.SharedDecisionSnapshot;
 import com.airsense.api.enforcement.EnforcementRecommendation;
 import com.airsense.api.explainability.ExplainabilityResult;
 import com.airsense.api.explainability.ExplainabilityService;
@@ -180,6 +181,8 @@ public class DecisionCopilotService {
             return insufficient(cityId, question, CopilotIntent.EXPLAIN_FORECAST, "Forecast is unavailable until a genuinely trained and evaluated model exists.");
         }
         List<CopilotCitation> citations = new ArrayList<>();
+        String forecastEngine = forecastEngine(decision, point);
+        citations.add(citation("FORECAST", "Forecast engine", forecastLabel(forecastEngine), point.getConfidence()));
         citations.add(citation("FORECAST", point.getHorizonHours() + "-hour AQI forecast",
                 "Predicted AQI " + point.getPredictedAqi() + " (" + point.getLowerBound() + "-" + point.getUpperBound() + ")", point.getConfidence()));
         citations.add(citation("FORECAST", "Trend", text(point.getTrend()), point.getConfidence()));
@@ -188,7 +191,7 @@ public class DecisionCopilotService {
             citations.add(citation("ATTRIBUTION", "Expected dominant source", point.getExpectedDominantSource().name(), attributionConfidence(decision)));
         }
         List<String> limitations = fallbackLimitations(decision);
-        String answer = "The forecast for the next " + point.getHorizonHours() + " hours is AQI "
+        String answer = "The " + forecastLabel(forecastEngine).toLowerCase(Locale.ROOT) + " for the next " + point.getHorizonHours() + " hours is AQI "
                 + point.getPredictedAqi() + " with a range of " + point.getLowerBound() + "-" + point.getUpperBound()
                 + ". The trend is " + text(point.getTrend()) + ". " + text(point.getMeteorologicalInfluence());
         if (forecastFallback(decision)) {
@@ -537,10 +540,14 @@ public class DecisionCopilotService {
         List<String> lines = new ArrayList<>();
         lines.add("contextMode: " + (frame == null || frame.isBlank() ? "LIVE_DECISION" : "REQUESTED_TIMELINE_FRAME"));
         lines.add("requestedTimelineFrame: " + firstText(frame, "none"));
+        lines.add("sharedSnapshotId: " + cleanForPrompt(firstText(grounding.get("sharedSnapshotId"))));
+        lines.add("locationKey: " + cleanForPrompt(firstText(grounding.get("locationKey"))));
         lines.add("station: " + cleanForPrompt(firstText(grounding.get("station"))));
         lines.add("currentAqi: " + cleanForPrompt(firstText(grounding.get("currentAqi"))));
         lines.add("aqiStandard: " + cleanForPrompt(firstText(grounding.get("aqiStandard"))));
         lines.add("provider: " + cleanForPrompt(firstText(grounding.get("provider"))));
+        lines.add("forecastStandard: " + cleanForPrompt(firstText(grounding.get("forecastStandard"))));
+        lines.add("forecastEngine: " + cleanForPrompt(firstText(grounding.get("forecastEngine"))));
         lines.add("observationTimestamp: " + cleanForPrompt(firstText(grounding.get("observedAt"))));
         lines.add("forecastHorizons: " + cleanForPrompt(forecastSummary(decision)));
         lines.add("fallbackReason: " + cleanForPrompt(fallbackReason(decision)));
@@ -727,12 +734,17 @@ public class DecisionCopilotService {
         Map<String, Object> signals = decision != null && decision.getEnvironmentalSignals() != null
                 ? decision.getEnvironmentalSignals()
                 : Map.of();
+        SharedDecisionSnapshot snapshot = decision != null ? decision.getSharedSnapshot() : null;
         Map<String, Object> grounding = new LinkedHashMap<>();
-        grounding.put("station", firstText(signals.get("stationName"), signals.get("providerReturnedStation"), decision != null ? decision.getCity() : null, decision != null ? decision.getCityId() : null));
-        grounding.put("currentAqi", decision != null && decision.getCurrentAQI() != null ? decision.getCurrentAQI() : "unavailable");
-        grounding.put("aqiStandard", firstText(signals.get("aqiStandard"), signals.get("standard"), decision != null && decision.getForecast() != null ? decision.getForecast().getForecastStandard() : null));
-        grounding.put("provider", firstText(signals.get("aqiProvider"), signals.get("primaryAqiProvider"), "unavailable"));
-        grounding.put("observedAt", firstText(decision != null ? decision.getSnapshotObservedAt() : null, signals.get("providerTimestamp"), decision != null ? decision.getSnapshotGeneratedAt() : null, decision != null ? decision.getGeneratedAt() : null));
+        grounding.put("sharedSnapshotId", firstText(snapshot != null ? snapshot.getSnapshotId() : null, decision != null ? decision.getSnapshotId() : null));
+        grounding.put("locationKey", firstText(snapshot != null ? snapshot.getStationLocationKey() : null, snapshot != null ? snapshot.getSearchedLocationKey() : null, decision != null ? decision.getLocationKey() : null));
+        grounding.put("station", firstText(snapshot != null ? snapshot.getStationName() : null, signals.get("stationName"), signals.get("providerReturnedStation"), decision != null ? decision.getCity() : null, decision != null ? decision.getCityId() : null));
+        grounding.put("currentAqi", snapshot != null && snapshot.getCurrentAqi() != null ? snapshot.getCurrentAqi() : decision != null && decision.getCurrentAQI() != null ? decision.getCurrentAQI() : "unavailable");
+        grounding.put("aqiStandard", firstText(snapshot != null ? snapshot.getCurrentAqiStandard() : null, signals.get("aqiStandard"), signals.get("standard"), decision != null && decision.getForecast() != null ? decision.getForecast().getForecastStandard() : null));
+        grounding.put("provider", firstText(snapshot != null ? snapshot.getCurrentProvider() : null, signals.get("aqiProvider"), signals.get("primaryAqiProvider"), "unavailable"));
+        grounding.put("forecastStandard", firstText(snapshot != null ? snapshot.getForecastStandard() : null, decision != null && decision.getForecast() != null ? decision.getForecast().getForecastStandard() : null));
+        grounding.put("forecastEngine", forecastLabel(forecastEngine(decision, null)));
+        grounding.put("observedAt", firstText(snapshot != null ? snapshot.getObservedAt() : null, decision != null ? decision.getSnapshotObservedAt() : null, signals.get("providerTimestamp"), decision != null ? decision.getSnapshotGeneratedAt() : null, decision != null ? decision.getGeneratedAt() : null));
         return grounding;
     }
 
@@ -774,6 +786,32 @@ public class DecisionCopilotService {
                 && (decision.getForecast().isFallbackUsed()
                 || "UNAVAILABLE".equalsIgnoreCase(decision.getForecast().getMode())
                 || "UNAVAILABLE".equalsIgnoreCase(decision.getForecast().getModelVersion()));
+    }
+
+    private String forecastEngine(DecisionIntelligenceResult decision, ForecastPoint point) {
+        ForecastResult forecast = decision != null ? decision.getForecast() : null;
+        ForecastPoint selected = point != null ? point : forecast != null && forecast.getForecast() != null
+                ? forecast.getForecast().values().stream()
+                .filter(candidate -> candidate != null && candidate.getPredictedAqi() != null)
+                .findFirst()
+                .orElse(null)
+                : null;
+        return firstText(
+                selected != null ? selected.getEngine() : null,
+                selected != null ? selected.getMode() : null,
+                forecast != null ? forecast.getEngine() : null,
+                forecast != null ? forecast.getMode() : null,
+                forecast != null ? forecast.getModelVersion() : null,
+                "Forecast Engine");
+    }
+
+    private String forecastLabel(String engine) {
+        String normalized = engine != null ? engine.toUpperCase(Locale.ROOT) : "";
+        if (normalized.contains("OPEN_METEO_PROVIDER_FORECAST")) return "Atmospheric Provider Forecast";
+        if (normalized.contains("CHRONOS_BOLT_ZERO_SHOT")) return "Pretrained AI Forecast";
+        if (normalized.contains("PERSISTENCE_FALLBACK")) return "Persistence Forecast Fallback";
+        if (normalized.contains("UNAVAILABLE")) return "Forecast Unavailable";
+        return "Forecast Engine";
     }
 
     private List<CopilotEvidence> evidenceFromCitations(List<CopilotCitation> citations) {

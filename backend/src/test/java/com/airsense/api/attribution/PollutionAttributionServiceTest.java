@@ -86,7 +86,9 @@ class PollutionAttributionServiceTest {
 
         assertThat(result.getDominantSource()).isEqualTo(PollutionSourceType.UNKNOWN);
         assertThat(result.getStatus()).isEqualTo("UNAVAILABLE");
-        assertThat(result.getSources()).isEmpty();
+        assertThat(result.getSources()).hasSize(1);
+        assertThat(result.getSources().get(0).getSourceType()).isEqualTo(PollutionSourceType.UNKNOWN);
+        assertThat(result.getSources().get(0).getEstimatedContributionPercent()).isEqualTo(100);
         assertThat(result.getUnknownContributionPercent()).isEqualTo(100);
         assertThat(result.getOverallConfidence()).isZero();
     }

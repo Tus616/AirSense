@@ -78,6 +78,28 @@ class ExplainabilityServiceTest {
     }
 
     @Test
+    void openMeteoProviderForecastIsNotExplainedAsLocalModelPrediction() {
+        DecisionIntelligenceResult decision = decision(false, false, false, false, 0.74);
+        decision.getForecast().setEngine("OPEN_METEO_PROVIDER_FORECAST");
+        decision.getForecast().setMode("OPEN_METEO_PROVIDER_FORECAST");
+        decision.getForecast().getForecast().values().forEach(point -> {
+            point.setEngine("OPEN_METEO_PROVIDER_FORECAST");
+            point.setMode("OPEN_METEO_PROVIDER_FORECAST");
+        });
+
+        ExplainabilityResult result = service.explain(decision);
+
+        assertThat(result.getReasoning()).anyMatch(step -> step.getStatement().contains("Atmospheric Provider Forecast predicts AQI"));
+        assertThat(result.getEvidence()).anyMatch(item -> item.getProvider().equals("Atmospheric Provider Forecast"));
+        assertThat(result.getModelExplanations()).anyMatch(model -> model.getModelName().equals("Atmospheric Provider Forecast")
+                && model.getRulesFired().contains("provider_forecast_used")
+                && !model.getRulesFired().contains("model_prediction_used")
+                && model.getExplanation().contains("not a locally trained/promoted ML model"));
+        assertThat(result.getLimitations()).contains("Forecast is an atmospheric provider forecast, not a locally trained/promoted model.");
+        assertThat(result.getExplanation()).contains("atmospheric provider forecast peak");
+    }
+
+    @Test
     void providerFailureIsReported() {
         ExplainabilityResult result = service.explain(decision(false, false, false, true, 0.52));
 

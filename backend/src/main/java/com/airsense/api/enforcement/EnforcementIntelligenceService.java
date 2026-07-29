@@ -257,17 +257,25 @@ public class EnforcementIntelligenceService {
                 .recommendationId("ENF-" + UUID.randomUUID())
                 .city(signals.city)
                 .wardId(signals.wardId)
+                .priority(priority)
                 .priorityScore(priority)
                 .priorityLevel(priorityLevel(priority))
                 .actionType(candidate.actionType)
                 .responsibleAgency(candidate.responsibleAgency)
+                .targetArea(valueOrDefault(signals.wardId, signals.cityId))
                 .location(signals.location)
                 .reason(candidate.reason + ". " + candidate.action + ".")
+                .recommendedActions(List.of(candidate.action))
                 .evidence(candidate.evidence)
+                .supportingEvidence(candidate.evidence)
                 .datasetsUsed(datasets)
                 .expectedImpact(expectedImpact(candidate.actionType, priority, signals))
                 .urgency(urgency(priority, signals))
+                .actionWindow(actionWindow(priority, signals))
                 .confidence(round(confidence))
+                .limitations(limitations(signals, candidate))
+                .forecastEngine(signals.forecastEngine)
+                .snapshotId(signals.snapshotId)
                 .generatedAt(Instant.now())
                 .build();
     }
@@ -349,6 +357,7 @@ public class EnforcementIntelligenceService {
                 .forecastPeakAqi(forecastPeak)
                 .forecastTrendWorsening(peak != null && "worsening".equalsIgnoreCase(peak.getTrend()))
                 .forecastConfidence(forecastConfidence)
+                .forecastEngine(forecastEngine(forecast, peak))
                 .dominantSource(dominantSource)
                 .attributionConfidence(attributionConfidence)
                 .populationDensity(firstPositive(number(population.get("populationDensity")), number(population.get("density")), number(population.get("population"))))
@@ -359,6 +368,7 @@ public class EnforcementIntelligenceService {
                 .providerCompleteness(providerCompleteness(context))
                 .providerConfidence(context.getProviderConfidence() != null ? context.getProviderConfidence() : Map.of())
                 .dataAvailable(dataAvailable)
+                .snapshotId(valueOrDefault(attribution.getSnapshotId(), forecast.getSnapshotId()))
                 .build();
     }
 
@@ -436,6 +446,38 @@ public class EnforcementIntelligenceService {
         if (priority >= 65 || signals.forecastTrendWorsening) return "TODAY";
         if (priority >= 40) return "24_HOURS";
         return "MONITOR";
+    }
+
+    private String actionWindow(int priority, EnforcementSignals signals) {
+        if (priority >= 80 || forecastExceeds(signals, 300)) return "0-6 hours";
+        if (priority >= 65 || signals.forecastTrendWorsening) return "Today";
+        if (priority >= 40) return "24 hours";
+        return "Monitor over next forecast cycle";
+    }
+
+    private List<String> limitations(EnforcementSignals signals, Candidate candidate) {
+        List<String> limitations = new ArrayList<>();
+        if (!signals.dataAvailable) {
+            limitations.add("No current AQI or source attribution was available; recommendation is dependency-status driven.");
+        }
+        if (signals.attributionConfidence < 0.35) {
+            limitations.add("Low attribution confidence; use cautious monitoring or inspection language before punitive action.");
+        }
+        if ("OPEN_METEO_PROVIDER_FORECAST".equals(signals.forecastEngine)) {
+            limitations.add("Forecast input is an atmospheric provider forecast, not a locally promoted CPCB model.");
+        }
+        if (candidate.actionType == EnforcementActionType.INDUSTRIAL_INSPECTION && signals.dominantSource != PollutionSourceType.INDUSTRIAL) {
+            limitations.add("Industrial action requires actual industrial evidence and is not inferred from regional transport.");
+        }
+        return limitations;
+    }
+
+    private String forecastEngine(ForecastResult forecast, ForecastPoint peak) {
+        if (peak != null && peak.getEngine() != null && !peak.getEngine().isBlank()) return peak.getEngine();
+        if (peak != null && peak.getMode() != null && !peak.getMode().isBlank()) return peak.getMode();
+        if (forecast.getEngine() != null && !forecast.getEngine().isBlank()) return forecast.getEngine();
+        if (forecast.getMode() != null && !forecast.getMode().isBlank()) return forecast.getMode();
+        return valueOrDefault(forecast.getModelVersion(), "UNAVAILABLE");
     }
 
     private Map<String, Object> location(CityEnvironmentalContext context) {
@@ -523,6 +565,7 @@ public class EnforcementIntelligenceService {
         private Integer forecastPeakAqi;
         private boolean forecastTrendWorsening;
         private double forecastConfidence;
+        private String forecastEngine;
         private PollutionSourceType dominantSource;
         private double attributionConfidence;
         private double populationDensity;
@@ -533,6 +576,7 @@ public class EnforcementIntelligenceService {
         private double providerCompleteness;
         private Map<String, Double> providerConfidence;
         private boolean dataAvailable;
+        private String snapshotId;
     }
 
     @lombok.Builder
