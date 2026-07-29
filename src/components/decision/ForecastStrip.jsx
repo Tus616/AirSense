@@ -143,6 +143,10 @@ export default function ForecastStrip({ forecastResult, activeHorizon }) {
                   <dd>{labelize(point.aqiStandard || forecastResult?.forecastStandard, "Unavailable")}</dd>
                 </div>
                 <div>
+                  <dt>Provider</dt>
+                  <dd>{labelize(point.provider || forecastResult?.provider || forecastResult?.currentProvider, "Unavailable")}</dd>
+                </div>
+                <div>
                   <dt>Target</dt>
                   <dd>{point.targetTime ? new Date(point.targetTime).toLocaleString() : "Unavailable"}</dd>
                 </div>

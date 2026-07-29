@@ -8,10 +8,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +27,7 @@ import java.util.Optional;
 public class MlForecastClient {
     private final RestTemplateBuilder restTemplateBuilder;
     private final MlForecastProperties properties;
+    private volatile MlForecastTrace lastTrace = MlForecastTrace.empty();
 
     public MlForecastClient(RestTemplateBuilder restTemplateBuilder, MlForecastProperties properties) {
         this.restTemplateBuilder = restTemplateBuilder;
@@ -30,6 +36,7 @@ public class MlForecastClient {
 
     public Optional<MlForecastResponse> predict(MlForecastRequest request) {
         if (!properties.isEnabled()) {
+            lastTrace = MlForecastTrace.skipped("ML_FORECAST_DISABLED", properties.getServiceUrl());
             return Optional.empty();
         }
         RestTemplate restTemplate = restTemplateBuilder
@@ -38,17 +45,39 @@ public class MlForecastClient {
                 .build();
         try {
             String serviceUrl = normalizeServiceUrl(properties.getServiceUrl());
+            log.info("ML forecast request snapshotId={} lat={} lon={} currentAqi={} standard={} horizons={} stationKey={} serviceUrl={}",
+                    request.getSnapshotId(), request.getLatitude(), request.getLongitude(), request.getCurrentAqi(),
+                    request.getForecastStandard(), request.getHorizons(), request.getStationKey(), serviceUrl);
             ResponseEntity<MlForecastResponse> response = restTemplate.postForEntity(
                     serviceUrl + "/internal/forecast/predict",
                     request,
                     MlForecastResponse.class
             );
-            return Optional.ofNullable(response.getBody());
-        } catch (Exception e) {
-            log.warn("ML forecast service unavailable snapshotId={} locationKey={} reason={}",
-                    request.getSnapshotId(), request.getLocationKey(), e.getMessage());
+            MlForecastResponse body = response.getBody();
+            lastTrace = MlForecastTrace.success(serviceUrl, response.getStatusCode().value(), body);
+            log.info("ML forecast response snapshotId={} status={} engines={} predictedAqi={}",
+                    request.getSnapshotId(), response.getStatusCode().value(), lastTrace.getEnginesByHorizon(), lastTrace.getPredictedAqiByHorizon());
+            return Optional.ofNullable(body);
+        } catch (HttpStatusCodeException e) {
+            lastTrace = MlForecastTrace.failed(properties.getServiceUrl(), e.getStatusCode().value(), "HTTP_" + e.getStatusCode().value(), e.getResponseBodyAsString());
+            log.warn("ML forecast HTTP failure snapshotId={} locationKey={} status={} reason={}",
+                    request.getSnapshotId(), request.getLocationKey(), e.getStatusCode().value(), safeMessage(e.getResponseBodyAsString()));
+            return Optional.empty();
+        } catch (ResourceAccessException e) {
+            lastTrace = MlForecastTrace.failed(properties.getServiceUrl(), null, "TIMEOUT_OR_CONNECTION_FAILURE", e.getMessage());
+            log.warn("ML forecast connection failure snapshotId={} locationKey={} reason={}",
+                    request.getSnapshotId(), request.getLocationKey(), safeMessage(e.getMessage()));
+            return Optional.empty();
+        } catch (RestClientException e) {
+            lastTrace = MlForecastTrace.failed(properties.getServiceUrl(), null, "DESERIALIZATION_OR_CLIENT_FAILURE", e.getMessage());
+            log.warn("ML forecast client failure snapshotId={} locationKey={} reason={}",
+                    request.getSnapshotId(), request.getLocationKey(), safeMessage(e.getMessage()));
             return Optional.empty();
         }
+    }
+    
+    public MlForecastTrace lastTrace() {
+        return lastTrace;
     }
 
     private String normalizeServiceUrl(String serviceUrl) {
@@ -57,6 +86,11 @@ public class MlForecastClient {
             resolved = resolved.substring(0, resolved.length() - 1);
         }
         return resolved;
+    }
+
+    private String safeMessage(String value) {
+        if (value == null || value.isBlank()) return "";
+        return value.replaceAll("(?i)(api[_-]?key|token|secret|password)=([^&\\s]+)", "$1=REDACTED");
     }
 
     @Data
@@ -133,6 +167,11 @@ public class MlForecastClient {
         private String stationKey;
         private String stationLocationKey;
         private String modelPromotionStatus;
+        private String promotionStatus;
+        private String targetTime;
+        private Integer historyObservationCount;
+        private Double historyCoverageHours;
+        private Double featureCoveragePercent;
         private Map<String, Object> trainingDeltaPercentiles;
         private String oodStatus;
         private Double oodScore;
@@ -141,5 +180,45 @@ public class MlForecastClient {
         private List<String> warnings;
         private Map<String, Object> featureDiagnostics;
         private Map<String, Object> modelContributions;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MlForecastTrace {
+        private String timestamp;
+        private String serviceUrl;
+        private Integer httpStatus;
+        private boolean deserializationSuccess;
+        private String failureType;
+        private String failureReason;
+        private Map<Integer, String> enginesByHorizon = new LinkedHashMap<>();
+        private Map<Integer, Integer> predictedAqiByHorizon = new LinkedHashMap<>();
+
+        static MlForecastTrace empty() {
+            return new MlForecastTrace(Instant.now().toString(), "", null, false, "NOT_CALLED", "", new LinkedHashMap<>(), new LinkedHashMap<>());
+        }
+
+        static MlForecastTrace skipped(String reason, String serviceUrl) {
+            return new MlForecastTrace(Instant.now().toString(), serviceUrl, null, false, "SKIPPED", reason, new LinkedHashMap<>(), new LinkedHashMap<>());
+        }
+
+        static MlForecastTrace failed(String serviceUrl, Integer status, String type, String reason) {
+            return new MlForecastTrace(Instant.now().toString(), serviceUrl, status, false, type, reason, new LinkedHashMap<>(), new LinkedHashMap<>());
+        }
+
+        static MlForecastTrace success(String serviceUrl, Integer status, MlForecastResponse response) {
+            Map<Integer, String> engines = new LinkedHashMap<>();
+            Map<Integer, Integer> values = new LinkedHashMap<>();
+            if (response != null && response.getPredictions() != null) {
+                for (MlForecastPrediction prediction : response.getPredictions()) {
+                    if (prediction.getHorizonHours() != null) {
+                        engines.put(prediction.getHorizonHours(), prediction.getEngine());
+                        values.put(prediction.getHorizonHours(), prediction.getPredictedAqi());
+                    }
+                }
+            }
+            return new MlForecastTrace(Instant.now().toString(), serviceUrl, status, true, null, null, engines, values);
+        }
     }
 }

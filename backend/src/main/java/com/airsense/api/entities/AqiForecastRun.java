@@ -37,6 +37,7 @@ public class AqiForecastRun {
     private Integer lowerBound;
     private Integer upperBound;
     private String forecastStandard;
+    private String provider;
     private String engine;
     private String modelVersion;
     private Integer baselinePredictedAqi;

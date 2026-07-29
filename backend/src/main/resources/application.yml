@@ -128,7 +128,9 @@ forecast:
   ml:
     enabled: ${ML_FORECAST_ENABLED:true}
     service-url: ${ML_FORECAST_SERVICE_URL:${AI_SERVICE_BASE_URL:http://localhost:8000}}
-    timeout-seconds: ${ML_FORECAST_TIMEOUT_SECONDS:5}
+    timeout-seconds: ${ML_FORECAST_TIMEOUT_SECONDS:35}
+    provider-forecast-standard: ${ML_FORECAST_PROVIDER_STANDARD:US_AQI}
+    provider-forecast-provider: ${ML_FORECAST_PROVIDER:OPEN_METEO}
     model-scope: ${ML_FORECAST_MODEL_SCOPE:GLOBAL}
     min-samples: ${ML_MODEL_PROMOTION_MIN_SAMPLES:200}
     min-rmse-improvement-percent: ${ML_MODEL_PROMOTION_MIN_RMSE_IMPROVEMENT_PERCENT:5}

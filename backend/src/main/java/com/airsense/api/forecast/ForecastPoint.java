@@ -78,6 +78,7 @@ public class ForecastPoint {
     private String stationLocationKey;
     private String snapshotId;
     private String aqiStandard;
+    private String provider;
     private String promotionStatus;
     private int historyObservationCount;
     private double historyCoverageHours;

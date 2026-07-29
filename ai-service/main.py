@@ -207,7 +207,7 @@ class InternalForecastPredictionRequest(BaseModel):
     forecastStandard: Optional[str] = None
     forecastIssueTime: Optional[str] = None
     providerObservedAt: Optional[str] = None
-    currentAqi: int
+    currentAqi: Optional[int] = None
     horizons: List[int] = Field(default_factory=lambda: [24, 48, 72])
     features: dict = Field(default_factory=dict)
     history: List[dict] = Field(default_factory=list)

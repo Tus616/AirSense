@@ -60,6 +60,7 @@ public class ForecastOrchestrator {
     private ForecastModelRegistryRepository modelRegistryRepository;
     @Autowired(required = false)
     private MlForecastProperties configuredMlProperties;
+    private volatile Map<String, Object> lastForecastTrace = Map.of();
 
     public ForecastResult forecast(ForecastRequest request) {
         ForecastRequest normalized = (request != null ? request : ForecastRequest.builder().build()).normalized();
@@ -192,7 +193,12 @@ public class ForecastOrchestrator {
                 p.setStationKey(stationKey);
                 p.setStationLocationKey(stationLocationKey);
                 p.setSnapshotId(forecastSnapshotId);
-                p.setAqiStandard(forecastStandard);
+                if (p.getAqiStandard() == null || p.getAqiStandard().isBlank()) {
+                    p.setAqiStandard(forecastStandard);
+                }
+                if (p.getProvider() == null || p.getProvider().isBlank()) {
+                    p.setProvider(currentProvider);
+                }
                 if (p.getForecastScope() == null || p.getForecastScope().isBlank() || "STATION".equals(p.getForecastScope())) {
                     p.setForecastScope(p.getMode() != null && p.getMode().startsWith("ML_")
                             ? "STATION_SPECIFIC_ML"
@@ -210,6 +216,11 @@ public class ForecastOrchestrator {
         }
 
         String engine = resultEngine(forecast);
+        String resultForecastStandard = forecast.values().stream()
+                .map(ForecastPoint::getAqiStandard)
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(forecastStandard);
         String modelVersion = ("CHRONOS_BOLT_ZERO_SHOT".equals(engine) || "OPEN_METEO_PROVIDER_FORECAST".equals(engine) || engine.startsWith("ML_")) ? forecast.values().stream()
                 .filter(point -> point.getMode() != null && ("CHRONOS_BOLT_ZERO_SHOT".equals(point.getMode()) || "OPEN_METEO_PROVIDER_FORECAST".equals(point.getMode()) || point.getMode().startsWith("ML_")))
                 .map(ForecastPoint::getModelVersion)
@@ -230,7 +241,7 @@ public class ForecastOrchestrator {
                 .locationHash(locationKey)
                 .location(locationMap(safeRequest, identity))
                 .currentAqi(currentAqi)
-                .forecastStandard(forecastStandard)
+                .forecastStandard(resultForecastStandard)
                 .currentProvider(currentProvider)
                 .engine(engine)
                 .stationKey(stationKey)
@@ -254,6 +265,10 @@ public class ForecastOrchestrator {
         log.info("ForecastOrchestrator Success locationKey={} engine={} standard={} observations={} confidence={}",
                 locationKey, engine, forecastStandard, orderedHistory.size(), result.getOverallConfidence());
         return result;
+    }
+
+    public Map<String, Object> lastForecastTrace() {
+        return lastForecastTrace;
     }
 
     private Map<String, ForecastPoint> persistenceBaseline(Integer currentAqi, String standard, Instant generatedAt,
@@ -323,10 +338,13 @@ public class ForecastOrchestrator {
         }
         String registryLookupKey = stationKey != null ? stationKey : stationLocationKey;
         List<String> candidateScopes = candidateModelScopes(registryLookupKey, history);
-        log.info("Calling AI forecast service registryLookupKey={} horizons={} observations={} host={}",
-                registryLookupKey, HORIZONS, history.size(), mlProperties.getServiceUrl());
+        String mlStandard = valueOrDefault(mlProperties.getProviderForecastStandard(), "US_AQI");
+        String mlProvider = valueOrDefault(mlProperties.getProviderForecastProvider(), "OPEN_METEO");
+        boolean sameStandardCurrent = mlStandard.equalsIgnoreCase(standard);
+        log.info("Calling AI forecast service registryLookupKey={} horizons={} observations={} host={} forecastStandard={} currentStandard={}",
+                registryLookupKey, HORIZONS, history.size(), mlProperties.getServiceUrl(), mlStandard, standard);
 
-        List<Map<String, Object>> mappedHistory = history.stream().map(h -> {
+        List<Map<String, Object>> mappedHistory = sameStandardCurrent ? history.stream().map(h -> {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("timestamp", h.getProviderObservedAt() != null ? h.getProviderObservedAt().toString() : null);
             map.put("currentAqi", h.getCurrentAqi());
@@ -335,7 +353,7 @@ public class ForecastOrchestrator {
             map.put("stationKey", h.getStationKey());
             map.put("stationLocationKey", h.getStationLocationKey());
             return map;
-        }).toList();
+        }).toList() : List.of();
 
         MlForecastClient.MlForecastRequest mlRequest = MlForecastClient.MlForecastRequest.builder()
                 .snapshotId(snapshotId(context))
@@ -349,16 +367,31 @@ public class ForecastOrchestrator {
                 .stationLongitude(stationLon)
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
-                .provider(string(first(safeMap(context.getAqi()).get("provider"), safeMap(asMap(safeMap(context.getAqi()).get("selected"))).get("provider"))))
-                .forecastStandard(standard)
+                .provider(mlProvider)
+                .forecastStandard(mlStandard)
+                .aqiStandard(mlStandard)
                 .forecastIssueTime(generatedAt.toString())
                 .providerObservedAt(generatedAt.toString())
-                .currentAqi(currentAqi)
+                .currentAqi(sameStandardCurrent ? currentAqi : null)
                 .horizons(new ArrayList<>(HORIZONS))
                 .candidateModelScopes(candidateScopes)
                 .features(modelFeatureMap(context, request, currentAqi, history, futureWeather))
                 .history(mappedHistory)
                 .build();
+        Map<String, Object> requestTrace = new LinkedHashMap<>();
+        requestTrace.put("lastAiRequestAt", Instant.now().toString());
+        requestTrace.put("serviceUrl", mlProperties.getServiceUrl());
+        requestTrace.put("snapshotId", mlRequest.getSnapshotId());
+        requestTrace.put("latitude", request.getLatitude());
+        requestTrace.put("longitude", request.getLongitude());
+        requestTrace.put("currentAqiSent", mlRequest.getCurrentAqi());
+        requestTrace.put("currentAqiStandard", standard);
+        requestTrace.put("forecastStandardSent", mlStandard);
+        requestTrace.put("providerSent", mlProvider);
+        requestTrace.put("horizons", HORIZONS);
+        requestTrace.put("historyRowsSent", mappedHistory.size());
+        requestTrace.put("persistenceSuppressedForStandardMismatch", !sameStandardCurrent);
+        lastForecastTrace = requestTrace;
         return mlForecastClient.predict(mlRequest)
                 .map(response -> mlForecastPoints(response, generatedAt, currentAqi, standard, features, baseline))
                 .orElseGet(() -> mlUnavailablePoints(HORIZONS, "ML_SERVICE_UNAVAILABLE"));
@@ -398,15 +431,16 @@ public class ForecastOrchestrator {
             String forecastScope = valueOrDefault(prediction.getForecastScope(),
                     "COORDINATE_ZERO_SHOT");
             String mlEngine = valueOrDefault(prediction.getEngine(), "CHRONOS_BOLT_ZERO_SHOT");
-            int predicted = clampAqi(prediction.getPredictedAqi(), standard);
+            String predictionStandard = valueOrDefault(prediction.getAqiStandard(), valueOrDefault(response.getForecastStandard(), standard));
+            int predicted = clampAqi(prediction.getPredictedAqi(), predictionStandard);
             double confidence = prediction.getConfidence() != null ? prediction.getConfidence() : 0.45;
             int fallbackBand = uncertaintyBand(List.of(currentAqi), confidence, horizon);
             ForecastPoint point = point(horizon, generatedAt, predicted, currentAqi, fallbackBand, trend(currentAqi, predicted),
                     confidence, mlEngine, valueOrDefault(prediction.getModelVersion(), "ai-service-live-forecast"),
                     "PERSISTENCE_FALLBACK".equalsIgnoreCase(mlEngine), features, List.of(driver(mlEngine, "PREDICT",
                             "AI service returned " + mlEngine + " for this horizon")));
-            point.setLowerBound(prediction.getLowerBound() != null ? clampAqi(prediction.getLowerBound(), standard) : point.getLowerBound());
-            point.setUpperBound(prediction.getUpperBound() != null ? clampAqi(prediction.getUpperBound(), standard) : point.getUpperBound());
+            point.setLowerBound(prediction.getLowerBound() != null ? clampAqi(prediction.getLowerBound(), predictionStandard) : point.getLowerBound());
+            point.setUpperBound(prediction.getUpperBound() != null ? clampAqi(prediction.getUpperBound(), predictionStandard) : point.getUpperBound());
             point.setEngine(mlEngine);
             point.setModelPromotionStatus("NOT_APPLICABLE");
             point.setForecastScope(forecastScope);
@@ -429,6 +463,12 @@ public class ForecastOrchestrator {
             point.setConfidenceLabel(valueOrDefault(prediction.getConfidenceLabel(), confidenceLabel(confidence)));
             point.setFallbackReason(prediction.getFallbackReason());
             point.setDataOrigin(valueOrDefault(prediction.getDataOrigin(), DataOrigin.FORECAST.name()));
+            point.setAqiStandard(predictionStandard);
+            point.setProvider(valueOrDefault(prediction.getProvider(), "OPEN_METEO"));
+            point.setTargetTime(instant(prediction.getTargetTime()) != null ? instant(prediction.getTargetTime()) : point.getTargetTime());
+            point.setHistoryObservationCount(prediction.getHistoryObservationCount() != null ? prediction.getHistoryObservationCount() : point.getHistoryObservationCount());
+            point.setHistoryCoverageHours(prediction.getHistoryCoverageHours() != null ? prediction.getHistoryCoverageHours() : point.getHistoryCoverageHours());
+            point.setFeatureCoveragePercent(prediction.getFeatureCoveragePercent() != null ? prediction.getFeatureCoveragePercent() : point.getFeatureCoveragePercent());
             point.setSufficientHistory(true);
             points.put(horizon + "h", point);
         }
@@ -944,6 +984,7 @@ public class ForecastOrchestrator {
                 .lowerBound(point.getLowerBound())
                 .upperBound(point.getUpperBound())
                 .forecastStandard(result.getForecastStandard())
+                .provider(point.getProvider())
                 .engine(point.getMode())
                 .modelVersion(point.getModelVersion())
                 .baselinePredictedAqi(result.getBaseline().get(point.getHorizonHours() + "h") != null

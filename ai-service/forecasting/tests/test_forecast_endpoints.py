@@ -133,6 +133,50 @@ def test_provider_forecast_fallback(monkeypatch):
     assert data["predictions"][0]["predictedAqi"] is not None
 
 
+def test_provider_forecast_accepts_provider_only_request_without_current_aqi(monkeypatch):
+    monkeypatch.setattr(chronos_service, "predict", lambda values, horizons: ({}, "CHRONOS_LOAD_FAILED"))
+
+    class FakeProvider:
+        enabled = True
+
+        def fetch(self, *args, **kwargs):
+            from forecasting.inference.open_meteo_client import ProviderSeries
+            now = pd.Timestamp.now(tz="UTC").floor("h")
+            return ProviderSeries(
+                observations=[],
+                hourly_forecast=[
+                    {"timestamp": (now + pd.Timedelta(hours=h)).isoformat(), "currentAqi": value, "aqiStandard": "US_AQI"}
+                    for h, value in [(24, 156), (48, 118), (72, 85)]
+                ],
+                provider="OPEN_METEO",
+                aqi_standard="US_AQI",
+                selected_aqi_field="us_aqi",
+                metadata={},
+            )
+
+    import main
+    monkeypatch.setattr(main, "open_meteo_client", FakeProvider())
+    response = client.post("/internal/forecast/predict", json={
+        "snapshotId": "snap-provider-only",
+        "locationKey": "in:28.614:77.209",
+        "searchedLocationKey": "in:28.614:77.209",
+        "latitude": 28.6139,
+        "longitude": 77.2090,
+        "forecastStandard": "US_AQI",
+        "aqiStandard": "US_AQI",
+        "provider": "OPEN_METEO",
+        "currentAqi": None,
+        "horizons": [24, 48, 72],
+        "history": [],
+    })
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["forecastStandard"] == "US_AQI"
+    assert [p["engine"] for p in data["predictions"]] == ["OPEN_METEO_PROVIDER_FORECAST"] * 3
+    assert [p["predictedAqi"] for p in data["predictions"]] == [156, 118, 85]
+
+
 def test_delta_target_converts_to_absolute_once(monkeypatch):
     class DeltaModel:
         def predict(self, frame):

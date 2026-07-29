@@ -150,14 +150,23 @@ function fallbackReasonLabel(reason) {
     EXTREME_FORECAST_CHANGE: "Extreme forecast change",
     OUT_OF_DISTRIBUTION_FEATURES: "Out-of-distribution features",
     LOW_GENERALIZATION_CONFIDENCE: "Low generalization confidence",
+    CHRONOS_DISABLED: "Pretrained model disabled",
+    CHRONOS_UNAVAILABLE: "Pretrained model unavailable",
+    INSUFFICIENT_HISTORY_FOR_CHRONOS: "Insufficient history for pretrained model",
+    PROVIDER_FORECAST_UNAVAILABLE: "Provider forecast unavailable",
+    PROVIDER_FORECAST_STANDARD_MISMATCH: "Provider forecast uses a different AQI standard",
   };
-  return labels[reason] || labelize(reason, "No fallback reason reported");
+  return String(reason || "")
+    .split(";")
+    .filter(Boolean)
+    .map((part) => labels[part] || labelize(part, "No fallback reason reported"))
+    .join(" / ");
 }
 
 function hasFallbackDiagnostics(point) {
-  return Boolean(point?.fallbackReason)
-    || asArray(point?.insufficiencyReasons).length > 0
-    || engineLabel(point, {}) === "Persistence";
+  const mode = point?.engine || point?.mode || "";
+  return mode === "PERSISTENCE" || mode === "PERSISTENCE_FALLBACK" || mode === "UNAVAILABLE"
+    || asArray(point?.insufficiencyReasons).length > 0;
 }
 
 function advisoryAudienceKey(item) {
@@ -228,6 +237,10 @@ function actionDetailText(item) {
 
 function engineLabel(point, forecastResult) {
   const mode = point?.engine || point?.mode || forecastResult?.engine || forecastResult?.mode || point?.modelFamily || "UNAVAILABLE";
+  if (mode === "CHRONOS_BOLT_ZERO_SHOT") return "Pretrained AI Forecast";
+  if (mode === "OPEN_METEO_PROVIDER_FORECAST") return "Atmospheric Provider Forecast";
+  if (mode === "PERSISTENCE_FALLBACK") return "Persistence Fallback";
+  if (mode === "UNAVAILABLE") return "Forecast Unavailable";
   if (mode.startsWith("ML_") || point?.modelPromotionStatus === "PROMOTED" || point?.promotionStatus === "PROMOTED") {
     return "Validated ML Model";
   }
@@ -1310,7 +1323,7 @@ function CollectorModelStatusCard({ decision, timeline }) {
   const forecast = decision?.forecast || {};
   const points = getForecastPoints(forecast);
   const promoted = points.filter((point) => point.modelPromotionStatus === "PROMOTED" || point.promotionStatus === "PROMOTED").length;
-  const fallback = points.filter((point) => point.fallbackReason || engineLabel(point, forecast) === "Persistence").length;
+  const fallback = points.filter(hasFallbackDiagnostics).length;
   const diagnostic = toDisplayText(decision?.engineStatus?.message, "No collector/model diagnostic message was returned.");
   return (
     <MotionCard className="uqi-panel uqi-system-health-card">
@@ -1342,7 +1355,7 @@ function LiveForecastCard({ forecastResult, compact = false }) {
       />
       <p className="uqi-note">
         Station forecast only: {toDisplayText(forecastResult?.stationName || points.find((point) => point.stationName)?.stationName, "Unknown station")}.
-        {!compact && <> Provider {labelize(forecastResult?.currentProvider, "unavailable")}, standard {labelize(forecastResult?.forecastStandard, "unavailable")}.</>}
+        {!compact && <> Current provider {labelize(forecastResult?.currentProvider, "unavailable")}; forecast standard {labelize(forecastResult?.forecastStandard, "unavailable")}.</>}
       </p>
       {!compact && fallbackPoints.length > 0 && (
         <div className="uqi-warning-banner" role="status">
@@ -1428,6 +1441,7 @@ function ForecastHorizonCard({ point, forecastResult, compact }) {
             <div><dt>History</dt><dd>{toDisplayText(point.validObservationCount, "0")} observations / {toDisplayText(point.coverageHours, "0")} hours</dd></div>
             <div><dt>Target time</dt><dd>{formatDateTime(point.targetTime)}</dd></div>
             <div><dt>Standard</dt><dd>{labelize(point.aqiStandard || forecastResult?.forecastStandard, "Unavailable")}</dd></div>
+            <div><dt>Provider</dt><dd>{labelize(point.provider || forecastResult?.provider || forecastResult?.currentProvider, "Unavailable")}</dd></div>
             <div><dt>Scope</dt><dd>{labelize(point.forecastScope, "Unavailable")}</dd></div>
             <div><dt>Baseline</dt><dd>{formatAqi(point.baselinePredictedAqi)}</dd></div>
           </dl>

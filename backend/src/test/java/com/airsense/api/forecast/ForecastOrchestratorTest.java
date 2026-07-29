@@ -274,8 +274,54 @@ class ForecastOrchestratorTest {
                         && "forecasting-feature-schema-v2".equals(req.getFeatures().get("featureSchemaVersion"))
                         && Double.valueOf(28.6).equals(req.getFeatures().get("latitude"))
                         && Double.valueOf(77.2).equals(req.getFeatures().get("longitude"))
-                        && req.getHistory().stream().noneMatch(row -> "GLOBAL".equals(row.get("locationKey")))
-                        && req.getHistory().stream().allMatch(row -> "in:28.600:77.200".equals(row.get("locationKey")))));
+                        && "US_AQI".equals(req.getForecastStandard())
+                        && "OPEN_METEO".equals(req.getProvider())
+                        && req.getCurrentAqi() == null
+                        && req.getHistory().isEmpty()));
+    }
+
+    @Test
+    void providerForecastWithChronosDisabledReasonIsNotReplacedByPersistence() {
+        ForecastOrchestrator orchestrator = orchestrator();
+        MlForecastProperties properties = new MlForecastProperties();
+        properties.setEnabled(true);
+        MlForecastClient client = mock(MlForecastClient.class);
+
+        List<MlForecastClient.MlForecastPrediction> predictions = List.of(
+                providerPrediction(24, 156, 138, 174),
+                providerPrediction(48, 118, 100, 136),
+                providerPrediction(72, 85, 67, 103)
+        );
+        when(client.predict(any(MlForecastClient.MlForecastRequest.class))).thenReturn(Optional.of(
+                new MlForecastClient.MlForecastResponse("snapshot-provider", "in:28.600:77.200", "US_AQI",
+                        Instant.now().toString(), predictions)));
+        ReflectionTestUtils.setField(orchestrator, "configuredMlProperties", properties);
+        ReflectionTestUtils.setField(orchestrator, "mlForecastClient", client);
+
+        ForecastResult result = orchestrator.forecast(
+                baseContext("DELHI", 97, "INDIA_NAQI")
+                        .historicalAQI(historySequence("INDIA_NAQI", 72, 90, 1))
+                        .weather(weatherForecast(2.0, 70, 0.0))
+                        .build(),
+                request("DELHI")
+        );
+
+        assertThat(result.getEngine()).isEqualTo("OPEN_METEO_PROVIDER_FORECAST");
+        assertThat(result.getForecastStandard()).isEqualTo("US_AQI");
+        assertThat(result.isFallbackUsed()).isFalse();
+        assertThat(result.getForecast().get("24h").getPredictedAqi()).isEqualTo(156);
+        assertThat(result.getForecast().get("48h").getPredictedAqi()).isEqualTo(118);
+        assertThat(result.getForecast().get("72h").getPredictedAqi()).isEqualTo(85);
+        assertThat(result.getForecast().get("24h").getMode()).isEqualTo("OPEN_METEO_PROVIDER_FORECAST");
+        assertThat(result.getForecast().get("24h").getFallbackReason()).isEqualTo("CHRONOS_DISABLED");
+        assertThat(result.getForecast().get("24h").getProvider()).isEqualTo("OPEN_METEO");
+        verify(client).predict(argThat(req ->
+                "US_AQI".equals(req.getForecastStandard())
+                        && "US_AQI".equals(req.getAqiStandard())
+                        && "OPEN_METEO".equals(req.getProvider())
+                        && req.getCurrentAqi() == null
+                        && req.getHistory().isEmpty()
+                        && req.getHorizons().equals(List.of(24, 48, 72))));
     }
 
     @Test
@@ -497,6 +543,29 @@ class ForecastOrchestratorTest {
                 .longitude(77.2)
                 .wardId("WARD-1")
                 .build();
+    }
+
+    private MlForecastClient.MlForecastPrediction providerPrediction(int horizon, int predicted, int lower, int upper) {
+        MlForecastClient.MlForecastPrediction prediction = new MlForecastClient.MlForecastPrediction();
+        prediction.setStatus("FORECAST");
+        prediction.setHorizonHours(horizon);
+        prediction.setPredictedAqi(predicted);
+        prediction.setLowerBound(lower);
+        prediction.setUpperBound(upper);
+        prediction.setEngine("OPEN_METEO_PROVIDER_FORECAST");
+        prediction.setForecastScope("COORDINATE_ZERO_SHOT");
+        prediction.setModelFamily("PROVIDER_NUMERICAL_FORECAST");
+        prediction.setModelVersion("open-meteo-air-quality");
+        prediction.setConfidence(0.55);
+        prediction.setConfidenceLabel("MEDIUM");
+        prediction.setFallbackReason("CHRONOS_DISABLED");
+        prediction.setAqiStandard("US_AQI");
+        prediction.setProvider("OPEN_METEO");
+        prediction.setTargetTime(Instant.now().plusSeconds(horizon * 3600L).toString());
+        prediction.setHistoryObservationCount(169);
+        prediction.setHistoryCoverageHours(168.0);
+        prediction.setDataOrigin("OPEN_METEO_PROVIDER_FORECAST");
+        return prediction;
     }
 }
 
