@@ -80,13 +80,14 @@ export function forecastPointAvailable(point) {
 export function normalizeForecast(forecastResult) {
   const points = getNormalizedForecastPoints(forecastResult);
   const validPoints = points.filter(forecastPointAvailable);
-  const engine = points.find((point) => point?.engine || point?.mode)?.engine
+  const pointEngine = points.find((point) => point?.engine || point?.mode)?.engine
     || points.find((point) => point?.engine || point?.mode)?.mode
-    || forecastResult?.engine
-    || forecastResult?.mode
     || "";
+  const engine = pointEngine || forecastResult?.engine || forecastResult?.mode || "";
   const engineKey = String(engine || "").toUpperCase();
-  const providerForecast = engineKey === "OPEN_METEO_PROVIDER_FORECAST";
+  const providerForecast = engineKey === "OPEN_METEO_PROVIDER_FORECAST"
+    || validPoints.some((point) => String(point?.engine || point?.mode || "").toUpperCase() === "OPEN_METEO_PROVIDER_FORECAST")
+    || String(forecastResult?.engine || forecastResult?.mode || "").toUpperCase() === "OPEN_METEO_PROVIDER_FORECAST";
   const persistenceFallbackCount = validPoints.filter((point) => {
     const mode = String(point?.engine || point?.mode || "").toUpperCase();
     return mode === "PERSISTENCE" || mode === "PERSISTENCE_FALLBACK" || point?.fallbackUsed === true;

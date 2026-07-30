@@ -1380,6 +1380,12 @@ function LiveForecastCard({ forecastResult, moduleStatus, compact = false }) {
   const fallbackPoints = points.filter(hasFallbackDiagnostics);
   const providerForecast = forecast.providerForecast;
   const firstStationName = forecastResult?.stationName || points.find((point) => point.stationName)?.stationName;
+  const locationName = toDisplayText(forecastResult?.city || forecastResult?.cityId, "the selected location");
+  const scopeText = providerForecast
+    ? firstStationName
+      ? `Atmospheric forecast near ${firstStationName}.`
+      : `Coordinate-based atmospheric forecast for ${locationName}.`
+    : "Latest observed AQI carried forward temporarily where a provider forecast is unavailable.";
   return (
     <MotionCard className={`uqi-panel uqi-forecast-card-shell ${compact ? "is-compact" : ""}`}>
       <PanelHeader
@@ -1388,9 +1394,7 @@ function LiveForecastCard({ forecastResult, moduleStatus, compact = false }) {
         chip={forecast.available ? forecast.engineLabel : moduleStatusLabel(moduleStatus, "Forecast evidence not available")}
       />
       <p className="uqi-note">
-        {providerForecast
-          ? "Coordinate forecast from the atmospheric provider for the selected location."
-          : `Station forecast only: ${toDisplayText(firstStationName, "Unknown station")}.`}
+        {scopeText}
         {!compact && <> Current provider {enumLabel(forecastResult?.currentProvider, "provider evidence not available")}; forecast provider {forecast.providerLabel}; forecast standard {enumLabel(forecast.standard, "AQI standard unavailable")}.</>}
       </p>
       {!compact && fallbackPoints.length > 0 && (

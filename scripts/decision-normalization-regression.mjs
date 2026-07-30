@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   enumLabel,
   normalizeAttribution,
@@ -63,6 +64,25 @@ assert.equal(normalizedForecast.horizonCount, 3);
 assert.equal(normalizedForecast.engineLabel, "Atmospheric Forecast");
 assert.equal(normalizedForecast.provider, "OPEN_METEO");
 assert.equal(normalizedForecast.persistenceFallbackCount, 0);
+
+const mumbaiForecast = {
+  engine: "PERSISTENCE_FALLBACK",
+  mode: "PERSISTENCE_FALLBACK",
+  currentProvider: "CPCB_CAAQMS",
+  stationName: "Bandra Kurla Complex, Mumbai - MPCB",
+  forecast: {
+    "24h": { predictedAqi: 63, engine: "OPEN_METEO_PROVIDER_FORECAST", provider: "OPEN_METEO", aqiStandard: "US_AQI", fallbackReason: "CHRONOS_DISABLED", fallbackUsed: false },
+    "48h": { predictedAqi: 60, engine: "OPEN_METEO_PROVIDER_FORECAST", provider: "OPEN_METEO", aqiStandard: "US_AQI", fallbackReason: "CHRONOS_DISABLED", fallbackUsed: false },
+    "72h": { predictedAqi: 59, engine: "OPEN_METEO_PROVIDER_FORECAST", provider: "OPEN_METEO", aqiStandard: "US_AQI", fallbackReason: "CHRONOS_DISABLED", fallbackUsed: false },
+  },
+};
+const normalizedMumbaiForecast = normalizeForecast(mumbaiForecast);
+assert.equal(normalizedMumbaiForecast.providerForecast, true);
+assert.equal(normalizedMumbaiForecast.engineLabel, "Atmospheric Forecast");
+assert.equal(normalizedMumbaiForecast.standard, "US_AQI");
+assert.equal(normalizedMumbaiForecast.persistenceFallbackCount, 0);
+assert.deepEqual(normalizedMumbaiForecast.validPoints.map((point) => point.predictedAqi), [63, 60, 59]);
+assert.equal(readFileSync(new URL("../src/pages/DecisionDashboard.jsx", import.meta.url), "utf8").includes("Station forecast only"), false);
 
 const health = normalizeOperationalHealth(decision, { frames: [{}, {}, {}, {}, {}] });
 assert.equal(health.degraded, false);

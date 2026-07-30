@@ -331,6 +331,115 @@ class ForecastOrchestratorTest {
     }
 
     @Test
+    void mumbaiBkcIndiaCurrentAqiUsesCoordinateOpenMeteoUsAqiForecast() {
+        ForecastOrchestrator orchestrator = orchestrator();
+        MlForecastProperties properties = new MlForecastProperties();
+        properties.setEnabled(true);
+        MlForecastClient client = mock(MlForecastClient.class);
+
+        List<MlForecastClient.MlForecastPrediction> predictions = List.of(
+                providerPrediction(24, 63, 45, 81),
+                providerPrediction(48, 60, 42, 78),
+                providerPrediction(72, 59, 41, 77)
+        );
+        when(client.predict(any(MlForecastClient.MlForecastRequest.class))).thenReturn(Optional.of(
+                new MlForecastClient.MlForecastResponse("snapshot-mumbai-bkc", "in:19.076:72.878", "US_AQI",
+                        Instant.now().toString(), predictions)));
+        ReflectionTestUtils.setField(orchestrator, "configuredMlProperties", properties);
+        ReflectionTestUtils.setField(orchestrator, "mlForecastClient", client);
+
+        ForecastResult result = orchestrator.forecast(
+                mumbaiBkcContext(71).historicalAQI(historySequence("INDIA_NAQI", 72, 71, 0)).build(),
+                mumbaiRequest()
+        );
+
+        assertThat(result.getCurrentAqi()).isEqualTo(71);
+        assertThat(result.getCurrentProvider()).isEqualTo("CPCB_CAAQMS");
+        assertThat(result.getEngine()).isEqualTo("OPEN_METEO_PROVIDER_FORECAST");
+        assertThat(result.getForecastStandard()).isEqualTo("US_AQI");
+        assertThat(result.isFallbackUsed()).isFalse();
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getPredictedAqi)
+                .containsExactly(63, 60, 59);
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getMode)
+                .containsOnly("OPEN_METEO_PROVIDER_FORECAST");
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getProvider)
+                .containsOnly("OPEN_METEO");
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getAqiStandard)
+                .containsOnly("US_AQI");
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getFallbackReason)
+                .containsOnly("CHRONOS_DISABLED");
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getForecastScope)
+                .containsOnly("COORDINATE_ZERO_SHOT");
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::isFallbackUsed)
+                .containsOnly(false);
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getStationName)
+                .containsOnly("Bandra Kurla Complex, Mumbai - MPCB");
+
+        verify(client).predict(argThat(req ->
+                Double.valueOf(19.076).equals(req.getLatitude())
+                        && Double.valueOf(72.8777).equals(req.getLongitude())
+                        && Double.valueOf(19.057).equals(req.getStationLatitude())
+                        && Double.valueOf(72.859).equals(req.getStationLongitude())
+                        && "Bandra Kurla Complex, Mumbai - MPCB".equals(req.getStationName())
+                        && "US_AQI".equals(req.getForecastStandard())
+                        && "US_AQI".equals(req.getAqiStandard())
+                        && "OPEN_METEO".equals(req.getProvider())
+                        && req.getCurrentAqi() == null
+                        && req.getHistory().isEmpty()
+                        && req.getHorizons().equals(List.of(24, 48, 72))));
+        assertThat(orchestrator.lastForecastTrace())
+                .containsEntry("resolvedLatitude", 19.076)
+                .containsEntry("resolvedLongitude", 72.8777)
+                .containsEntry("requestedForecastProvider", "OPEN_METEO")
+                .containsEntry("requestedForecastStandard", "US_AQI")
+                .containsEntry("currentAqi", 71)
+                .containsEntry("currentAqiStandard", "INDIA_NAQI")
+                .containsEntry("currentAqiSent", null)
+                .containsEntry("historyRowsSent", 0)
+                .containsEntry("historyOmittedForStandardMismatch", true)
+                .containsEntry("selectedEngine", "OPEN_METEO_PROVIDER_FORECAST")
+                .containsEntry("persistenceFallbackSelected", false);
+    }
+
+    @Test
+    void mumbaiBkcUsesPersistenceOnlyWhenAiProviderRequestFails() {
+        ForecastOrchestrator orchestrator = orchestrator();
+        MlForecastProperties properties = new MlForecastProperties();
+        properties.setEnabled(true);
+        MlForecastClient client = mock(MlForecastClient.class);
+
+        when(client.predict(any(MlForecastClient.MlForecastRequest.class))).thenReturn(Optional.empty());
+        ReflectionTestUtils.setField(orchestrator, "configuredMlProperties", properties);
+        ReflectionTestUtils.setField(orchestrator, "mlForecastClient", client);
+
+        ForecastResult result = orchestrator.forecast(
+                mumbaiBkcContext(71).historicalAQI(history("INDIA_NAQI", 71)).build(),
+                mumbaiRequest()
+        );
+
+        assertThat(result.getEngine()).isEqualTo("PERSISTENCE_FALLBACK");
+        assertThat(result.getForecastStandard()).isEqualTo("INDIA_NAQI");
+        assertThat(result.isFallbackUsed()).isTrue();
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getPredictedAqi)
+                .containsExactly(71, 71, 71);
+        assertThat(result.getForecast().values())
+                .extracting(ForecastPoint::getMode)
+                .containsOnly("PERSISTENCE");
+        assertThat(orchestrator.lastForecastTrace())
+                .containsEntry("persistenceFallbackSelected", true)
+                .containsEntry("persistenceFallbackReason", "AI_RESPONSE_EMPTY");
+    }
+
+    @Test
     void exactDeployedOpenMeteoResponseIsSelectedAndStoredAsProviderForecast() throws Exception {
         ForecastOrchestrator orchestrator = orchestrator();
         MlForecastProperties properties = new MlForecastProperties();
@@ -715,6 +824,54 @@ class ForecastOrchestratorTest {
                 .longitude(77.2)
                 .wardId("WARD-1")
                 .build();
+    }
+
+    private ForecastRequest mumbaiRequest() {
+        return ForecastRequest.builder()
+                .cityId("MUMBAI")
+                .cityName("Mumbai")
+                .state("Maharashtra")
+                .country("India")
+                .latitude(19.076)
+                .longitude(72.8777)
+                .wardId("WARD-1")
+                .build();
+    }
+
+    private CityEnvironmentalContext.CityEnvironmentalContextBuilder mumbaiBkcContext(int currentAqi) {
+        Instant observedAt = Instant.now().minusSeconds(600);
+        return CityEnvironmentalContext.builder()
+                .city("Mumbai")
+                .cityId("MUMBAI")
+                .coordinates(Map.of("latitude", 19.076, "longitude", 72.8777))
+                .timestamp(Instant.now())
+                .aqi(Map.of(
+                        "currentAqi", currentAqi,
+                        "standard", "INDIA_NAQI",
+                        "provider", "CPCB_CAAQMS",
+                        "observedAt", observedAt.toString(),
+                        "selected", Map.of(
+                                "currentAqi", currentAqi,
+                                "standard", "INDIA_NAQI",
+                                "provider", "CPCB_CAAQMS",
+                                "observedAt", observedAt.toString(),
+                                "stationName", "Bandra Kurla Complex, Mumbai - MPCB",
+                                "stationLatitude", 19.057,
+                                "stationLongitude", 72.859
+                        ),
+                        "stations", List.of(Map.of(
+                                "sensorId", "mumbai_bandra_kurla_complex",
+                                "stationName", "Bandra Kurla Complex, Mumbai - MPCB",
+                                "provider", "CPCB_CAAQMS",
+                                "standard", "INDIA_NAQI",
+                                "currentAqi", currentAqi,
+                                "latitude", 19.057,
+                                "longitude", 72.859
+                        ))
+                ))
+                .providerStatus(Map.of("aqi", "SUCCESS", "weather", "SUCCESS"))
+                .providerConfidence(Map.of("aqi", 0.92, "weather", 0.90))
+                .weather(weatherForecast(2.2, 72, 0.0));
     }
 
     private MlForecastClient.MlForecastPrediction providerPrediction(int horizon, int predicted, int lower, int upper) {

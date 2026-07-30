@@ -341,8 +341,9 @@ public class ForecastOrchestrator {
         String mlStandard = valueOrDefault(mlProperties.getProviderForecastStandard(), "US_AQI");
         String mlProvider = valueOrDefault(mlProperties.getProviderForecastProvider(), "OPEN_METEO");
         boolean sameStandardCurrent = mlStandard.equalsIgnoreCase(standard);
-        log.info("Calling AI forecast service registryLookupKey={} horizons={} observations={} host={} forecastStandard={} currentStandard={}",
-                registryLookupKey, HORIZONS, history.size(), mlProperties.getServiceUrl(), mlStandard, standard);
+        Map<String, Object> coordinates = safeMap(context.getCoordinates());
+        Double resolvedLatitude = request.getLatitude() != null ? request.getLatitude() : number(coordinates.get("latitude"));
+        Double resolvedLongitude = request.getLongitude() != null ? request.getLongitude() : number(coordinates.get("longitude"));
 
         List<Map<String, Object>> mappedHistory = sameStandardCurrent ? history.stream().map(h -> {
             Map<String, Object> map = new LinkedHashMap<>();
@@ -365,8 +366,8 @@ public class ForecastOrchestrator {
                 .stationName(stationName)
                 .stationLatitude(stationLat)
                 .stationLongitude(stationLon)
-                .latitude(request.getLatitude())
-                .longitude(request.getLongitude())
+                .latitude(resolvedLatitude)
+                .longitude(resolvedLongitude)
                 .provider(mlProvider)
                 .forecastStandard(mlStandard)
                 .aqiStandard(mlStandard)
@@ -382,19 +383,62 @@ public class ForecastOrchestrator {
         requestTrace.put("lastAiRequestAt", Instant.now().toString());
         requestTrace.put("serviceUrl", mlProperties.getServiceUrl());
         requestTrace.put("snapshotId", mlRequest.getSnapshotId());
-        requestTrace.put("latitude", request.getLatitude());
-        requestTrace.put("longitude", request.getLongitude());
-        requestTrace.put("currentAqiSent", mlRequest.getCurrentAqi());
+        requestTrace.put("selectedCity", valueOrDefault(context.getCity(), request.getCityName()));
+        requestTrace.put("selectedStationName", valueOrDefault(stationName, ""));
+        requestTrace.put("resolvedLatitude", resolvedLatitude);
+        requestTrace.put("resolvedLongitude", resolvedLongitude);
+        requestTrace.put("stationLatitude", stationLat);
+        requestTrace.put("stationLongitude", stationLon);
+        requestTrace.put("requestedForecastProvider", mlProvider);
+        requestTrace.put("requestedForecastStandard", mlStandard);
+        requestTrace.put("currentAqi", currentAqi);
         requestTrace.put("currentAqiStandard", standard);
-        requestTrace.put("forecastStandardSent", mlStandard);
-        requestTrace.put("providerSent", mlProvider);
+        requestTrace.put("currentAqiProvider", valueOrDefault(string(first(safeMap(context.getAqi()).get("provider"),
+                asMap(safeMap(context.getAqi()).get("selected")).get("provider"))), ""));
+        requestTrace.put("currentAqiSent", mlRequest.getCurrentAqi());
         requestTrace.put("horizons", HORIZONS);
         requestTrace.put("historyRowsSent", mappedHistory.size());
-        requestTrace.put("persistenceSuppressedForStandardMismatch", !sameStandardCurrent);
+        requestTrace.put("historyOmittedForStandardMismatch", !sameStandardCurrent);
+        log.info("Forecast AI provider request city={} station={} lat={} lon={} stationLat={} stationLon={} provider={} forecastStandard={} currentAqi={} currentStandard={} currentAqiSent={} historyRowsSent={} horizons={}",
+                requestTrace.get("selectedCity"), requestTrace.get("selectedStationName"), resolvedLatitude, resolvedLongitude,
+                stationLat, stationLon, mlProvider, mlStandard, currentAqi, standard, mlRequest.getCurrentAqi(), mappedHistory.size(), HORIZONS);
+
+        Optional<MlForecastClient.MlForecastResponse> response = mlForecastClient.predict(mlRequest);
+        MlForecastClient.MlForecastTrace responseTrace = mlForecastClient.lastTrace();
+        if (responseTrace == null) {
+            responseTrace = MlForecastClient.MlForecastTrace.empty();
+        }
+        requestTrace.put("aiHttpStatus", responseTrace.getHttpStatus());
+        requestTrace.put("aiFailureType", valueOrDefault(responseTrace.getFailureType(), ""));
+        requestTrace.put("aiFailureReason", valueOrDefault(responseTrace.getFailureReason(), ""));
+        requestTrace.put("aiEnginesByHorizon", responseTrace.getEnginesByHorizon());
+        requestTrace.put("aiPredictedAqiByHorizon", responseTrace.getPredictedAqiByHorizon());
+        requestTrace.put("aiResponseBodyPreview", valueOrDefault(responseTrace.getResponseBodyPreview(), ""));
+        if (response.isEmpty()) {
+            requestTrace.put("persistenceFallbackSelected", true);
+            String fallbackReason = valueOrDefault(responseTrace.getFailureType(), "AI_RESPONSE_EMPTY");
+            if ("NOT_CALLED".equals(fallbackReason)) {
+                fallbackReason = "AI_RESPONSE_EMPTY";
+            }
+            requestTrace.put("persistenceFallbackReason", fallbackReason);
+            lastForecastTrace = requestTrace;
+            log.warn("Forecast AI provider unavailable city={} lat={} lon={} provider={} forecastStandard={} fallbackReason={} httpStatus={}",
+                    requestTrace.get("selectedCity"), resolvedLatitude, resolvedLongitude, mlProvider, mlStandard,
+                    requestTrace.get("persistenceFallbackReason"), responseTrace.getHttpStatus());
+            return mlUnavailablePoints(HORIZONS, "ML_SERVICE_UNAVAILABLE");
+        }
+        Map<String, ForecastPoint> points = mlForecastPoints(response.get(), generatedAt, currentAqi, standard, features, baseline);
+        boolean validProviderForecast = points.values().stream()
+                .anyMatch(point -> point != null && point.getPredictedAqi() != null
+                        && "OPEN_METEO_PROVIDER_FORECAST".equalsIgnoreCase(valueOrDefault(point.getMode(), point.getEngine())));
+        requestTrace.put("persistenceFallbackSelected", !validProviderForecast && points.values().stream().anyMatch(ForecastPoint::isFallbackUsed));
+        requestTrace.put("selectedEngine", resultEngine(points));
         lastForecastTrace = requestTrace;
-        return mlForecastClient.predict(mlRequest)
-                .map(response -> mlForecastPoints(response, generatedAt, currentAqi, standard, features, baseline))
-                .orElseGet(() -> mlUnavailablePoints(HORIZONS, "ML_SERVICE_UNAVAILABLE"));
+        log.info("Forecast AI provider response city={} lat={} lon={} httpStatus={} selectedEngine={} predictedAqiByHorizon={} fallbackSelected={}",
+                requestTrace.get("selectedCity"), resolvedLatitude, resolvedLongitude, responseTrace.getHttpStatus(),
+                requestTrace.get("selectedEngine"), responseTrace.getPredictedAqiByHorizon(),
+                requestTrace.get("persistenceFallbackSelected"));
+        return points;
     }
 
     private Map<String, ForecastPoint> mlForecastPoints(MlForecastClient.MlForecastResponse response,
