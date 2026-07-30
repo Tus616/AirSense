@@ -71,6 +71,66 @@ export function labelize(value, fallback = "Unknown") {
   return toDisplayText(value, fallback).replace(/_/g, " ");
 }
 
+export function forecastEngineLabel(value, fallback = "Forecast unavailable") {
+  const key = String(value || "").trim().toUpperCase();
+  const labels = {
+    CHRONOS_BOLT_ZERO_SHOT: "Pretrained AI Forecast",
+    OPEN_METEO_PROVIDER_FORECAST: "Atmospheric Provider Forecast",
+    PERSISTENCE_FALLBACK: "Persistence Fallback",
+    PERSISTENCE: "Persistence Fallback",
+    TREND_WEATHER_V1: "Trend + Weather",
+    UNAVAILABLE: "Forecast Unavailable",
+  };
+  if (labels[key]) return labels[key];
+  if (key.startsWith("ML_")) return "Validated ML Model";
+  return labelize(value, fallback);
+}
+
+export function fallbackReasonLabel(reason, engine = "") {
+  const labels = {
+    MODEL_NOT_PROMOTED: "Model not promoted",
+    ARTIFACT_UNAVAILABLE: "Model artifact unavailable",
+    ML_SERVICE_UNAVAILABLE: "AI service unavailable",
+    FEATURE_SCHEMA_MISMATCH: "Feature schema mismatch",
+    INSUFFICIENT_CONTIGUOUS_LIVE_HISTORY: "Insufficient contiguous live history",
+    LIVE_HISTORY_STALE: "Live history is stale",
+    LIVE_HISTORY_COVERAGE_LOW: "Live history coverage is low",
+    LIVE_HISTORY_GAP_TOO_LARGE: "Live history gap is too large",
+    CHECKSUM_MISMATCH: "Model checksum mismatch",
+    FALLBACK_ENGINE_USED: "Fallback engine used",
+    CHRONOS_LOAD_FAILED: "Pretrained model unavailable",
+    CHRONOS_UNAVAILABLE: "Pretrained model unavailable",
+    INSUFFICIENT_HISTORY_FOR_CHRONOS: "Insufficient history for pretrained model",
+    PROVIDER_FORECAST_UNAVAILABLE: "Provider forecast unavailable",
+    PROVIDER_FORECAST_STANDARD_MISMATCH: "Provider forecast uses a different AQI standard",
+    CURRENT_AQI_UNAVAILABLE: "Current AQI unavailable",
+  };
+  const engineKey = String(engine || "").trim().toUpperCase();
+  return String(reason || "")
+    .split(";")
+    .filter(Boolean)
+    .map((part) => {
+      const key = part.trim();
+      if (key === "CHRONOS_DISABLED" && engineKey === "OPEN_METEO_PROVIDER_FORECAST") {
+        return "Chronos skipped; provider forecast used";
+      }
+      if (key === "CHRONOS_DISABLED") return "Pretrained model disabled";
+      return labels[key] || labelize(key, "No fallback reason reported");
+    })
+    .join(" / ");
+}
+
+export function isProviderForecast(point, forecastResult = {}) {
+  const engine = String(point?.engine || point?.mode || forecastResult?.engine || forecastResult?.mode || "").toUpperCase();
+  return engine === "OPEN_METEO_PROVIDER_FORECAST";
+}
+
+export function isActualForecastFallback(point, forecastResult = {}) {
+  if (isProviderForecast(point, forecastResult)) return false;
+  const engine = String(point?.engine || point?.mode || forecastResult?.engine || forecastResult?.mode || "").toUpperCase();
+  return engine === "PERSISTENCE" || engine === "PERSISTENCE_FALLBACK" || engine === "UNAVAILABLE" || Boolean(point?.fallbackUsed);
+}
+
 export function friendlyEnum(value, fallback = "Unknown") {
   const key = String(value || "").toUpperCase();
   const labels = {

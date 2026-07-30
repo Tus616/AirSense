@@ -1,42 +1,20 @@
-import { formatPercent, formatScore, getAqiTone, getForecastPoints, labelize, toDisplayText } from "./decisionUtils";
+import {
+  fallbackReasonLabel,
+  forecastEngineLabel,
+  formatPercent,
+  formatScore,
+  getAqiTone,
+  getForecastPoints,
+  isActualForecastFallback,
+  isProviderForecast,
+  labelize,
+  toDisplayText,
+} from "./decisionUtils";
 
 function forecastStatus(point, forecastResult) {
   const mode = point?.engine || point?.mode || forecastResult?.mode || "";
-  if (mode === "CHRONOS_BOLT_ZERO_SHOT") return "Pretrained AI Forecast";
-  if (mode === "OPEN_METEO_PROVIDER_FORECAST") return "Atmospheric Provider Forecast";
-  if (mode === "PERSISTENCE_FALLBACK") return "Persistence Fallback";
-  if (mode === "UNAVAILABLE") return "Forecast Unavailable";
-  if (mode === "ML_PROMOTED" || (mode.startsWith("ML_") && point?.modelPromotionStatus === "PROMOTED")) return "Validated ML Model";
-  if (mode === "TREND_WEATHER_V1") return "Trend + Weather";
-  if (mode === "PERSISTENCE" || mode === "PERSISTENCE_FALLBACK") return "Persistence Fallback";
   if (mode === "UNAVAILABLE" || point?.predictedAqi === null || point?.predictedAqi === undefined) return "Unavailable";
-  return labelize(mode, "Unavailable");
-}
-
-function fallbackReasonLabel(reason) {
-  const labels = {
-    MODEL_NOT_PROMOTED: "Model not promoted",
-    ARTIFACT_UNAVAILABLE: "Model artifact unavailable",
-    ML_SERVICE_UNAVAILABLE: "ML service unavailable",
-    FEATURE_SCHEMA_MISMATCH: "Feature schema mismatch",
-    INSUFFICIENT_CONTIGUOUS_LIVE_HISTORY: "Insufficient contiguous live history",
-    LIVE_HISTORY_STALE: "Live history is stale",
-    LIVE_HISTORY_COVERAGE_LOW: "Live history coverage is low",
-    LIVE_HISTORY_GAP_TOO_LARGE: "Live history gap is too large",
-    CHECKSUM_MISMATCH: "Model checksum mismatch",
-    FALLBACK_ENGINE_USED: "Fallback engine used",
-    CHRONOS_LOAD_FAILED: "Pretrained model unavailable",
-    CHRONOS_UNAVAILABLE: "Pretrained model unavailable",
-    INSUFFICIENT_HISTORY_FOR_CHRONOS: "Insufficient history for pretrained model",
-    PROVIDER_FORECAST_UNAVAILABLE: "Provider forecast unavailable",
-    PROVIDER_FORECAST_STANDARD_MISMATCH: "Provider forecast uses a different AQI standard",
-    CURRENT_AQI_UNAVAILABLE: "Current AQI unavailable",
-  };
-  return String(reason || "")
-    .split(";")
-    .filter(Boolean)
-    .map((part) => labels[part] || labelize(part, "Fallback reason unavailable"))
-    .join(" / ");
+  return forecastEngineLabel(mode, "Unavailable");
 }
 
 export default function ForecastStrip({ forecastResult, activeHorizon }) {
@@ -53,24 +31,27 @@ export default function ForecastStrip({ forecastResult, activeHorizon }) {
           <span className="decision-eyebrow">Forecast Engine</span>
           <h2>24h / 48h / 72h Outlook</h2>
         </div>
-        <span className="decision-chip">{labelize(forecastMode, "Trend unavailable")}</span>
+        <span className="decision-chip">{forecastEngineLabel(forecastMode, "Trend unavailable")}</span>
       </div>
       <p className="decision-panel__note">
         Snapshot: {toDisplayText(forecastResult?.snapshotId, "unavailable")}
         {" | "}Location: {toDisplayText(forecastResult?.locationHash, "unavailable")}
         {" | "}Generated: {toDisplayText(forecastResult?.generatedAt, "unavailable")}
         {" | "}Standard: {labelize(forecastResult?.forecastStandard, "UNAVAILABLE")}
-        {" | "}Provider: {labelize(forecastResult?.currentProvider, "UNAVAILABLE")}
-        {" | "}Status: {labelize(forecastMode, "UNAVAILABLE")}
+        {" | "}Current provider: {labelize(forecastResult?.currentProvider, "UNAVAILABLE")}
+        {" | "}Forecast provider: {labelize(points.find((point) => point?.provider)?.provider || forecastResult?.provider, "UNAVAILABLE")}
+        {" | "}Status: {forecastEngineLabel(forecastMode, "UNAVAILABLE")}
         {" | "}Confidence: {formatPercent(forecastResult?.overallConfidence)}
         {forecastResult?.stationKey ? ` | Station: ${forecastResult.stationKey}` : ""}
       </p>
       <p className="decision-panel__note" style={{ color: "var(--accent-orange)", fontWeight: 500 }}>
-        Disclaimer: This forecast represents the selected monitoring station ({toDisplayText(forecastResult?.stationName || points[0]?.stationName, "Unknown Station")}) and is not a city-wide average.
+        {isProviderForecast(points[0], forecastResult)
+          ? "Open-Meteo provider horizons are coordinate forecasts for the selected location and use the US AQI standard."
+          : `Disclaimer: This forecast represents the selected monitoring station (${toDisplayText(forecastResult?.stationName || points[0]?.stationName, "Unknown Station")}) and is not a city-wide average.`}
       </p>
       {Array.isArray(forecastResult?.warnings) && forecastResult.warnings.length > 0 ? (
         <p className="decision-panel__note">
-          Warnings: {forecastResult.warnings.map((warning) => labelize(warning)).join(", ")}
+          Warnings: {forecastResult.warnings.map((warning) => fallbackReasonLabel(warning, forecastMode)).join(", ")}
         </p>
       ) : null}
 
@@ -120,7 +101,7 @@ export default function ForecastStrip({ forecastResult, activeHorizon }) {
                 </div>
                 <div>
                   <dt>Mode</dt>
-                  <dd>{labelize(mode, "Unavailable")}</dd>
+                  <dd>{forecastEngineLabel(mode, "Unavailable")}</dd>
                 </div>
                 <div>
                   <dt>Scope</dt>
@@ -136,7 +117,7 @@ export default function ForecastStrip({ forecastResult, activeHorizon }) {
                 </div>
                 <div>
                   <dt>Promotion</dt>
-                  <dd>{labelize(point.modelPromotionStatus || point.fallbackReason, "Not promoted")}</dd>
+                  <dd>{labelize(point.modelPromotionStatus || point.promotionStatus, "Not applicable")}</dd>
                 </div>
                 <div>
                   <dt>Standard</dt>
@@ -197,7 +178,9 @@ export default function ForecastStrip({ forecastResult, activeHorizon }) {
               {Array.isArray(point.insufficiencyReasons) && point.insufficiencyReasons.length > 0 ? (
                 <p>Internal checks: {point.insufficiencyReasons.map((reason) => labelize(reason)).join(", ")}</p>
               ) : null}
-              {point.fallbackReason ? <p>Fallback reason: {fallbackReasonLabel(point.fallbackReason)}</p> : null}
+              {point.fallbackReason ? (
+                <p>{isActualForecastFallback(point, forecastResult) ? "Fallback reason" : "Limitation"}: {fallbackReasonLabel(point.fallbackReason, mode)}</p>
+              ) : null}
               {Array.isArray(point.drivers) && point.drivers.length > 0 ? (
                 <p>{point.drivers.map((driver) => `${labelize(driver.factor)}: ${toDisplayText(driver.evidence)}`).join(" | ")}</p>
               ) : null}

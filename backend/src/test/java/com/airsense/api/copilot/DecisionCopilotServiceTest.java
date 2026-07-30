@@ -217,6 +217,40 @@ class DecisionCopilotServiceTest {
     }
 
     @Test
+    void operationalBriefingWorksWhenForecastExistsWithoutCurrentAqi() {
+        DecisionIntelligenceResult decision = decision(false, false);
+        decision.setCurrentAQI(null);
+        decision.setSharedSnapshot(SharedDecisionSnapshot.builder()
+                .snapshotId("snap-provider-only")
+                .forecastStandard("US_AQI")
+                .currentProvider("UNAVAILABLE")
+                .build());
+        decision.getForecast().setEngine("OPEN_METEO_PROVIDER_FORECAST");
+        decision.getForecast().setMode("OPEN_METEO_PROVIDER_FORECAST");
+        decision.getForecast().setForecastStandard("US_AQI");
+        decision.getForecast().getForecast().values().forEach(point -> {
+            point.setEngine("OPEN_METEO_PROVIDER_FORECAST");
+            point.setMode("OPEN_METEO_PROVIDER_FORECAST");
+        });
+        decisionService.result = decision;
+
+        CopilotResponse response = service.answer(request("Give the operational briefing for this city.", null));
+
+        assertThat(response.getIntent()).isEqualTo(CopilotIntent.CURRENT_CONDITION);
+        assertThat(response.getStatus()).isIn("SUCCESS", "PARTIAL");
+        assertThat(response.getMode()).isEqualTo("DETERMINISTIC_FALLBACK");
+        assertThat(response.getAnswer())
+                .contains("Current condition")
+                .contains("Forecast direction")
+                .contains("Atmospheric Provider Forecast")
+                .contains("Strongest attribution evidence")
+                .contains("Priority action")
+                .contains("Health advice");
+        assertThat(response.getCitations()).anyMatch(citation -> citation.getSourceType().equals("FORECAST")
+                && citation.getValue().contains("Predicted AQI"));
+    }
+
+    @Test
     void geminiConfiguredResponseUsesGroundedGeminiMode() throws Exception {
         FakeGeminiClient gemini = new FakeGeminiClient();
         gemini.result = json("""

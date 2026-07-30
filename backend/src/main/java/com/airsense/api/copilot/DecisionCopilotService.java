@@ -149,16 +149,38 @@ public class DecisionCopilotService {
 
     private CopilotResponse currentCondition(String cityId, String question, GroundedContext ctx, String frame) {
         DecisionIntelligenceResult decision = ctx.decision();
+        ForecastPoint point = forecastPoint(ctx, frame).orElse(null);
+        EnforcementRecommendation action = topRecommendation(decision).orElse(null);
         List<CopilotCitation> citations = new ArrayList<>();
         citations.add(citation("DECISION", "Current AQI", currentAqiText(decision), decision.getOverallConfidence()));
+        if (point != null && point.getPredictedAqi() != null) {
+            citations.add(citation("FORECAST", point.getHorizonHours() + "-hour forecast",
+                    "Predicted AQI " + point.getPredictedAqi() + " (" + point.getLowerBound() + "-" + point.getUpperBound() + ")", point.getConfidence()));
+        }
+        if (decision.getAttribution() != null) {
+            citations.add(citation("ATTRIBUTION", "Strongest attribution evidence", dominantSource(decision), attributionConfidence(decision)));
+        }
+        if (action != null) {
+            citations.add(citation("ENFORCEMENT", "Priority action", text(action.getActionType()), action.getConfidence()));
+        }
         if (decision.getRiskAssessment() != null) {
             citations.add(citation("RISK", "Overall risk", text(decision.getRiskAssessment().getOverallRiskLevel()), decision.getOverallConfidence()));
         }
-        String answer = "Current AQI is " + currentAqiText(decision) + ". "
+        String forecastText = point != null && point.getPredictedAqi() != null
+                ? " Forecast direction: " + point.getHorizonHours() + "h AQI " + point.getPredictedAqi()
+                + " via " + forecastLabel(forecastEngine(decision, point)) + "."
+                : " Forecast direction: unavailable.";
+        String sourceText = " Strongest attribution evidence: " + dominantSource(decision) + ".";
+        String actionText = action != null
+                ? " Priority action: " + text(action.getActionType()) + " for " + text(action.getResponsibleAgency())
+                + ". Recommended action: " + text(action.getReason()) + "."
+                : " Priority action: unavailable. Recommended action: unavailable.";
+        String advisoryText = " Health advice: " + healthAdvisorySummary(decision) + ".";
+        String answer = "Current condition: Current AQI is " + currentAqiText(decision) + ". "
                 + text(decision.getSummary() != null ? decision.getSummary().getWhatIsHappening() : null)
-                + " Recommended action: "
-                + text(decision.getSummary() != null ? decision.getSummary().getWhatShouldOfficialsDoNow() : null);
-        return response(cityId, question, CopilotIntent.CURRENT_CONDITION, answer, decision.getOverallConfidence(), citations, evidenceFromCitations(citations), ctx, frame, null, null);
+                + forecastText + sourceText + actionText + advisoryText
+                + " Limitations: " + String.join("; ", fallbackLimitations(decision));
+        return response(cityId, question, CopilotIntent.CURRENT_CONDITION, answer, minConfidence(citations), citations, evidenceFromCitations(citations), ctx, frame, dominantSource(decision), action != null && action.getActionType() != null ? action.getActionType().name() : null);
     }
 
     private CopilotResponse explainAqi(String cityId, String question, GroundedContext ctx, String frame) {
@@ -368,6 +390,7 @@ public class DecisionCopilotService {
 
     private CopilotIntent classify(String question) {
         String q = question.toLowerCase(Locale.ROOT);
+        if (containsAny(q, "briefing", "operational briefing", "situation brief", "decision brief", "summary for this city")) return CopilotIntent.CURRENT_CONDITION;
         if (containsAny(q, "what is this platform", "what can you answer", "help", "how do you work")) return CopilotIntent.GENERAL_PLATFORM_HELP;
         if (containsAny(q, "secret", "password", "token", "api key", "env", "system prompt", "chain-of-thought", "hidden reasoning", "execute", "run command")) return CopilotIntent.UNSUPPORTED;
         if (containsAny(q, "timeline", "+48", "48h", "change between", "compared", "current and")) return CopilotIntent.TEMPORAL_COMPARISON;
@@ -720,7 +743,7 @@ public class DecisionCopilotService {
     }
 
     private String status(DecisionIntelligenceResult decision, List<String> limitations) {
-        if (decision == null || decision.getCurrentAQI() == null || decision.getCurrentAQI() <= 0) {
+        if (decision == null || !hasCurrentOrForecastEvidence(decision)) {
             return "UNAVAILABLE";
         }
         if ((limitations != null && !limitations.isEmpty())
@@ -728,6 +751,15 @@ public class DecisionCopilotService {
             return "PARTIAL";
         }
         return "SUCCESS";
+    }
+
+    private boolean hasCurrentOrForecastEvidence(DecisionIntelligenceResult decision) {
+        if (decision.getCurrentAQI() != null && decision.getCurrentAQI() > 0) return true;
+        if (decision.getSharedSnapshot() != null && decision.getSharedSnapshot().getCurrentAqi() != null
+                && decision.getSharedSnapshot().getCurrentAqi() > 0) return true;
+        if (decision.getForecast() == null || decision.getForecast().getForecast() == null) return false;
+        return decision.getForecast().getForecast().values().stream()
+                .anyMatch(point -> point != null && point.getPredictedAqi() != null);
     }
 
     private Map<String, Object> grounding(DecisionIntelligenceResult decision) {

@@ -161,7 +161,9 @@ function fallbackReasonLabel(reason) {
   return String(reason || "")
     .split(";")
     .filter(Boolean)
-    .map((part) => labels[part] || labelize(part, "No fallback reason reported"))
+    .map((part) => part === "CHRONOS_DISABLED"
+      ? "Chronos skipped; provider forecast used"
+      : labels[part] || labelize(part, "No fallback reason reported"))
     .join(" / ");
 }
 
@@ -171,6 +173,7 @@ function statusFor(decision, key) {
 
 function hasFallbackDiagnostics(point) {
   const mode = point?.engine || point?.mode || "";
+  if (mode === "OPEN_METEO_PROVIDER_FORECAST") return false;
   return mode === "PERSISTENCE" || mode === "PERSISTENCE_FALLBACK" || mode === "UNAVAILABLE"
     || asArray(point?.insufficiencyReasons).length > 0;
 }
@@ -257,6 +260,11 @@ function engineLabel(point, forecastResult) {
   if (mode === "PERSISTENCE" || mode === "PERSISTENCE_FALLBACK") return "Persistence Fallback";
   if (mode === "UNAVAILABLE" || point?.predictedAqi == null) return "Unavailable";
   return labelize(mode);
+}
+
+function isProviderForecastPoint(point, forecastResult) {
+  const mode = point?.engine || point?.mode || forecastResult?.engine || forecastResult?.mode || "";
+  return mode === "OPEN_METEO_PROVIDER_FORECAST";
 }
 
 function stationNameFromDecision(decision) {
@@ -1361,6 +1369,9 @@ function CollectorModelStatusCard({ decision, timeline }) {
 function LiveForecastCard({ forecastResult, moduleStatus, compact = false }) {
   const points = getForecastPoints(forecastResult);
   const fallbackPoints = points.filter(hasFallbackDiagnostics);
+  const providerForecast = points.some((point) => isProviderForecastPoint(point, forecastResult));
+  const firstStationName = forecastResult?.stationName || points.find((point) => point.stationName)?.stationName;
+  const forecastProvider = points.find((point) => point.provider)?.provider || forecastResult?.provider;
   return (
     <MotionCard className={`uqi-panel uqi-forecast-card-shell ${compact ? "is-compact" : ""}`}>
       <PanelHeader
@@ -1369,8 +1380,10 @@ function LiveForecastCard({ forecastResult, moduleStatus, compact = false }) {
         chip={moduleStatusLabel(moduleStatus, engineLabel({ engine: forecastResult?.engine || forecastResult?.mode, modelVersion: forecastResult?.modelVersion }, forecastResult))}
       />
       <p className="uqi-note">
-        Station forecast only: {toDisplayText(forecastResult?.stationName || points.find((point) => point.stationName)?.stationName, "Unknown station")}.
-        {!compact && <> Current provider {labelize(forecastResult?.currentProvider, "unavailable")}; forecast standard {labelize(forecastResult?.forecastStandard, "unavailable")}.</>}
+        {providerForecast
+          ? "Coordinate forecast from the atmospheric provider for the selected location."
+          : `Station forecast only: ${toDisplayText(firstStationName, "Unknown station")}.`}
+        {!compact && <> Current provider {labelize(forecastResult?.currentProvider, "unavailable")}; forecast provider {labelize(forecastProvider, "unavailable")}; forecast standard {labelize(forecastResult?.forecastStandard, "unavailable")}.</>}
         {!compact && moduleStatus ? <> {moduleStatusReason(moduleStatus)}</> : null}
       </p>
       {!compact && fallbackPoints.length > 0 && (
@@ -1451,9 +1464,12 @@ function ForecastHorizonCard({ point, forecastResult, compact }) {
       )}
       {!compact && (
         <details className="uqi-details">
-          <summary>Model and fallback details</summary>
+          <summary>Model and limitations</summary>
           <dl className="uqi-definition-grid">
-            <div><dt>Fallback reason</dt><dd>{fallbackReasonLabel(point.fallbackReason || asArray(point.insufficiencyReasons)[0])}</dd></div>
+            <div>
+              <dt>{hasFallbackDiagnostics(point) ? "Fallback reason" : "Limitation"}</dt>
+              <dd>{fallbackReasonLabel(point.fallbackReason || asArray(point.insufficiencyReasons)[0]) || "No limitation reported"}</dd>
+            </div>
             <div><dt>History</dt><dd>{toDisplayText(point.validObservationCount, "0")} observations / {toDisplayText(point.coverageHours, "0")} hours</dd></div>
             <div><dt>Target time</dt><dd>{formatDateTime(point.targetTime)}</dd></div>
             <div><dt>Standard</dt><dd>{labelize(point.aqiStandard || forecastResult?.forecastStandard, "Unavailable")}</dd></div>
