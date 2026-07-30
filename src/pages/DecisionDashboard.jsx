@@ -39,10 +39,14 @@ import {
   toDisplayText,
 } from "../components/decision/decisionUtils";
 import {
+  buildSituationSummary,
   enumLabel,
+  normalizeActionQueue,
+  normalizeAreaIntelligence,
   normalizeAttribution,
   normalizeEnforcement,
   normalizeForecast,
+  normalizeOperationalAlerts,
   normalizeOperationalHealth,
   normalizeRiskDecision,
 } from "../services/decisionNormalization";
@@ -791,26 +795,153 @@ function OverviewPage({ context }) {
   const { decision, timeline, activeFrame, mapsReady } = context;
   return (
     <motion.div className="uqi-page-stack" variants={staggerContainer} initial="initial" animate="animate">
-      <section className="uqi-overview-command-grid">
-        <CurrentAqiCard decision={decision} />
-        <CitySummaryCard decision={decision} />
-        <LiveForecastCard forecastResult={decision?.forecast} moduleStatus={statusFor(decision, "forecast")} compact />
+      <SituationBriefingCard decision={decision} activeFrame={activeFrame} />
+      <OperationalSnapshotGrid decision={decision} />
+      <section className="uqi-command-workbench">
+        <AreasAttentionCard decision={decision} />
+        <ActionQueueCard decision={decision} />
       </section>
-
-      <section className="uqi-command-row uqi-command-row--insights">
-        <CollectorModelStatusCard decision={decision} timeline={timeline} />
-        <RiskDecisionCard decision={decision} activeFrame={activeFrame} />
+      <section className="uqi-command-workbench uqi-command-workbench--evidence">
         <SourceAttributionCard attribution={decision?.attribution} compact />
-      </section>
-
-      <section className="uqi-command-row uqi-command-row--operations">
-        <EnforcementSummaryCard decision={decision} />
         <HealthAdvisoryPreview decision={decision} />
         <CommandCenterBottomCards context={context} />
       </section>
-
       <GeospatialOverviewCard context={context} mapsReady={mapsReady} />
+      <SystemDataDiagnosticsCard decision={decision} timeline={timeline} />
     </motion.div>
+  );
+}
+
+function SituationBriefingCard({ decision, activeFrame }) {
+  const summary = buildSituationSummary(decision);
+  return (
+    <MotionCard className="uqi-panel uqi-command-briefing">
+      <PanelHeader eyebrow="Municipal Briefing" title={summary.what} chip={activeFrame?.label || summary.status} />
+      <div className="uqi-briefing-grid">
+        <BriefingItem label="Where" value={summary.where} />
+        <BriefingItem label="Likely cause" value={summary.why} />
+        <BriefingItem label="Forecast" value={summary.forecast} />
+        <BriefingItem label="Who is affected" value={summary.affected} />
+        <BriefingItem label="Action now" value={summary.action} />
+        <BriefingItem label="Agency status" value={summary.agency} />
+      </div>
+      <div className="uqi-briefing-footer">
+        <span>{summary.evidence}</span>
+        <span>{summary.status}</span>
+      </div>
+    </MotionCard>
+  );
+}
+
+function BriefingItem({ label, value }) {
+  return (
+    <div className="uqi-briefing-item">
+      <span>{label}</span>
+      <strong>{toDisplayText(value)}</strong>
+    </div>
+  );
+}
+
+function OperationalSnapshotGrid({ decision }) {
+  const summary = buildSituationSummary(decision);
+  const risk = normalizeRiskDecision(decision);
+  const forecast = normalizeForecast(decision?.forecast);
+  const attribution = normalizeAttribution(decision?.attribution);
+  const enforcement = normalizeEnforcement(decision);
+  const alerts = normalizeOperationalAlerts(decision);
+  return (
+    <section className="uqi-ops-snapshot-grid">
+      <SnapshotTile label="Current condition" value={summary.currentAqi == null ? "Unavailable" : formatAqi(summary.currentAqi)} detail={summary.what} tone={getAqiTone(summary.currentAqi)} />
+      <SnapshotTile label="72h outlook" value={summary.peakForecastAqi == null ? "Unavailable" : formatAqi(summary.peakForecastAqi)} detail={forecast.available ? `${risk.trend}; ${forecast.horizonCount} horizons available` : "Forecast evidence not available"} tone={getAqiTone(summary.peakForecastAqi)} />
+      <SnapshotTile label="Leading source" value={attribution.leadingSource?.sourceLabel || "Unavailable"} detail={attribution.leadingSource ? `${attribution.leadingSource.contributionText} contribution, ${attribution.leadingSource.confidenceText} confidence` : "Source evidence not available"} tone="neutral" />
+      <SnapshotTile label="Action queue" value={enforcement.actionLabel} detail={`${alerts.length} watch item${alerts.length === 1 ? "" : "s"}; ${enforcement.agencyStatus}`} tone={String(enforcement.priority).toLowerCase()} />
+    </section>
+  );
+}
+
+function SnapshotTile({ label, value, detail, tone = "neutral" }) {
+  return (
+    <MotionCard className={`uqi-panel uqi-snapshot-tile tone-${tone}`}>
+      <span>{label}</span>
+      <strong>{toDisplayText(value)}</strong>
+      <p>{toDisplayText(detail)}</p>
+    </MotionCard>
+  );
+}
+
+function AreasAttentionCard({ decision, limit = 4 }) {
+  const areas = normalizeAreaIntelligence(decision).slice(0, limit);
+  return (
+    <MotionCard className="uqi-panel uqi-area-command-card">
+      <PanelHeader eyebrow="Area Intelligence" title="Areas needing attention" chip={`${areas.length} visible`} />
+      <div className="uqi-area-table">
+        {areas.map((area) => (
+          <article className="uqi-area-row" key={area.id}>
+            <div>
+              <strong>{area.area}</strong>
+              <span>{area.evidence}</span>
+            </div>
+            <dl>
+              <div><dt>AQI</dt><dd>{formatAqi(area.currentAqi)}</dd></div>
+              <div><dt>Risk</dt><dd>{area.riskLevel}</dd></div>
+              <div><dt>Source</dt><dd>{area.likelySource}</dd></div>
+              <div><dt>Agency</dt><dd>{area.agency}</dd></div>
+            </dl>
+            <p>{area.recommendedAction}</p>
+          </article>
+        ))}
+      </div>
+      <Link className="uqi-inline-action" to="/gov/maps">Open map</Link>
+    </MotionCard>
+  );
+}
+
+function ActionQueueCard({ decision, limit = 4 }) {
+  const actions = normalizeActionQueue(decision).slice(0, limit);
+  return (
+    <MotionCard className="uqi-panel uqi-action-queue-card">
+      <PanelHeader eyebrow="Action Queue" title="Municipal work items" chip={`${actions.length} item${actions.length === 1 ? "" : "s"}`} />
+      <div className="uqi-work-item-list">
+        {actions.map((item) => (
+          <article className="uqi-work-item" key={item.id}>
+            <div>
+              <strong>{item.title}</strong>
+              <span>{item.reason}</span>
+            </div>
+            <div className="uqi-work-item__meta">
+              <span>{item.priority}</span>
+              <span>{item.agency}</span>
+              <span>{item.status}</span>
+              <span>{item.actionWindow}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+      <Link className="uqi-inline-action" to="/gov/enforcement">Manage actions</Link>
+    </MotionCard>
+  );
+}
+
+function SystemDataDiagnosticsCard({ decision, timeline }) {
+  const health = normalizeOperationalHealth(decision, timeline);
+  const diagnostic = toDisplayText(decision?.engineStatus?.message, "Core providers are online; optional model diagnostics are available below.");
+  return (
+    <MotionCard className="uqi-panel uqi-diagnostics-shell">
+      <details className="uqi-details">
+        <summary>System & Data Diagnostics</summary>
+        <div className="uqi-status-rows">
+          <span><i className="tone-low" /><b>Provider forecast</b><strong>{health.providerForecast}</strong></span>
+          <span><i className="tone-low" /><b>Forecast horizons</b><strong>{health.forecastHorizonCount}</strong></span>
+          <span><i className="tone-low" /><b>Timeline frames</b><strong>{health.timelineFrameCount}</strong></span>
+          <span><i className="tone-neutral" /><b>Optional AI model</b><strong>{health.optionalAiModel}</strong></span>
+        </div>
+        <dl className="uqi-definition-grid">
+          <div><dt>Locally promoted model horizons</dt><dd>{health.promotedHorizonCount}</dd></div>
+          <div><dt>Persistence fallback horizons</dt><dd>{health.persistenceFallbackHorizonCount}</dd></div>
+        </dl>
+        <p className="uqi-note">{diagnostic}</p>
+      </details>
+    </MotionCard>
   );
 }
 
@@ -861,46 +992,58 @@ function HealthAdvisoryPreview({ decision }) {
 
 function ForecastPage({ context }) {
   const points = getForecastPoints(context.decision?.forecast);
+  const forecast = normalizeForecast(context.decision?.forecast);
+  const risk = normalizeRiskDecision(context.decision);
+  const highest = forecast.validPoints.slice().sort((a, b) => asNumber(b.predictedAqi, -1) - asNumber(a.predictedAqi, -1))[0];
   return (
     <div className="uqi-page-stack">
       <PageIntro
         eyebrow="Forecast"
-        title="Live forecast and historical replay"
-        note="Live forecasts remain separate from replay state. Unavailable values are shown as unavailable, never as zero."
+        title="Expected air quality"
+        note="Forecasts show what officials should prepare for over the next three days. Technical engine details remain collapsed below."
       />
-      <LiveForecastCard forecastResult={context.decision?.forecast} moduleStatus={statusFor(context.decision, "forecast")} />
-      <HistoricalReplayCard expanded />
-      <section className="uqi-panel">
-        <PanelHeader eyebrow="Model Details" title="Horizon diagnostics" chip={`${points.length} horizons`} />
-        <div className="uqi-table-wrap">
-          <table className="uqi-table">
-            <thead>
-              <tr>
-                <th>Horizon</th>
-                <th>Prediction</th>
-                <th>Engine</th>
-                <th>Model</th>
-                <th>Promotion</th>
-                <th>Fallback reason</th>
-                <th>Confidence</th>
-              </tr>
-            </thead>
-            <tbody>
-              {points.map((point) => (
-                <tr key={point.key}>
-                  <td>{point.key}</td>
-                  <td>{formatAqi(point.predictedAqi)}</td>
-                  <td>{engineLabel(point, context.decision?.forecast)}</td>
-                  <td>{toDisplayText(point.modelVersion || point.modelFamily, "Unavailable")}</td>
-                  <td>{labelize(point.modelPromotionStatus || point.promotionStatus, "Unavailable")}</td>
-                  <td>{fallbackReasonLabel(point.fallbackReason || asArray(point.insufficiencyReasons)[0])}</td>
-                  <td>{confidenceText(point.confidence)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <section className="uqi-enforcement-grid">
+        <MetricCard label="Current AQI" value={formatAqi(risk.currentAqi)} tone={getAqiTone(risk.currentAqi)} />
+        <MetricCard label="Peak expected AQI" value={formatAqi(risk.peakForecastAqi)} tone={getAqiTone(risk.peakForecastAqi)} />
+        <MetricCard label="Trend" value={risk.trend} tone={risk.trend === "Worsening" ? "medium" : "low"} />
+        <MetricCard label="Highest horizon" value={highest?.key || "Unavailable"} tone="neutral" />
       </section>
+      <LiveForecastCard forecastResult={context.decision?.forecast} moduleStatus={statusFor(context.decision, "forecast")} />
+      <section className="uqi-panel uqi-diagnostics-shell">
+        <details className="uqi-details">
+          <summary>System & Data Diagnostics</summary>
+          <PanelHeader eyebrow="Forecast Diagnostics" title="Horizon details" chip={`${points.length} horizons`} />
+          <div className="uqi-table-wrap">
+            <table className="uqi-table">
+              <thead>
+                <tr>
+                  <th>Horizon</th>
+                  <th>Prediction</th>
+                  <th>Engine</th>
+                  <th>Model</th>
+                  <th>Promotion</th>
+                  <th>Fallback reason</th>
+                  <th>Confidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {points.map((point) => (
+                  <tr key={point.key}>
+                    <td>{point.key}</td>
+                    <td>{formatAqi(point.predictedAqi)}</td>
+                    <td>{engineLabel(point, context.decision?.forecast)}</td>
+                    <td>{toDisplayText(point.modelVersion || point.modelFamily, "Unavailable")}</td>
+                    <td>{labelize(point.modelPromotionStatus || point.promotionStatus, "Unavailable")}</td>
+                    <td>{fallbackReasonLabel(point.fallbackReason || asArray(point.insufficiencyReasons)[0])}</td>
+                    <td>{confidenceText(point.confidence)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+      <HistoricalReplayCard expanded />
     </div>
   );
 }
@@ -987,13 +1130,20 @@ function MapsPage({ context }) {
 }
 
 function SourceAnalysisPage({ context }) {
+  const normalized = normalizeAttribution(context.decision?.attribution);
   return (
     <div className="uqi-page-stack">
       <PageIntro
         eyebrow="Source Analysis"
-        title="Evidence-weighted attribution"
-        note="Unknown and partial evidence remain visible. These are model-derived estimates, not laboratory source-apportionment measurements."
+        title="What is likely causing pollution"
+        note="Contribution and confidence are shown separately. Unknown and partial evidence remain visible instead of being hidden."
       />
+      <section className="uqi-enforcement-grid">
+        <MetricCard label="Leading explained source" value={normalized.leadingSource?.sourceLabel || "Unavailable"} tone="neutral" />
+        <MetricCard label="Contribution" value={normalized.leadingSource?.contributionText || "Unavailable"} tone="medium" />
+        <MetricCard label="Confidence" value={normalized.leadingSource?.confidenceText || normalized.confidenceText} tone="low" />
+        <MetricCard label="Source rows" value={normalized.sources.length} tone="neutral" />
+      </section>
       <SourceAttributionCard attribution={context.decision?.attribution} />
     </div>
   );
@@ -1001,24 +1151,55 @@ function SourceAnalysisPage({ context }) {
 
 function EnforcementPage({ context }) {
   const enforcement = normalizeEnforcement(context.decision);
-  const tasks = enforcement.recommendations.length > 0 ? enforcement.recommendations : asArray(context.decision?.priorityActions);
+  const actions = normalizeActionQueue(context.decision);
+  const [workflow, setWorkflow] = useState({});
+  const visibleActions = actions.map((item) => ({ ...item, status: workflow[item.id] || item.status }));
+  const updateStatus = (id, status) => setWorkflow((current) => ({ ...current, [id]: status }));
 
   return (
     <div className="uqi-page-stack">
       <PageIntro
         eyebrow="Enforcement"
-        title="Municipal action queue"
-        note="This page only renders the existing enforcement response. It does not trigger enforcement workflow changes."
+        title="Municipal action management"
+        note="Workflow changes here are local planning state only. They do not write backend enforcement records."
       />
       <section className="uqi-enforcement-grid">
         <MetricCard label="Priority" value={enforcement.priority} tone="medium" />
         <MetricCard label="Agencies" value={enforcement.agencyStatus} tone="low" />
-        <MetricCard label="Actions" value={tasks.length || "No immediate enforcement required"} tone="neutral" />
+        <MetricCard label="Actions" value={visibleActions.length || "No immediate enforcement required"} tone="neutral" />
         <MetricCard label="Confidence" value={enforcement.confidenceText} tone="low" />
       </section>
-      <section className="uqi-panel">
-        <PanelHeader eyebrow="Recommended Actions" title="Actionable enforcement items" chip={`${tasks.length} items`} />
-        <ActionList items={tasks} empty="No enforcement actions were returned for this snapshot." variant="enforcement" />
+      <section className="uqi-panel uqi-enforcement-workbench">
+        <PanelHeader eyebrow="Recommended Actions" title="Actionable enforcement items" chip={`${visibleActions.length} items`} />
+        <div className="uqi-work-item-list">
+          {visibleActions.map((item) => (
+            <article className="uqi-work-item uqi-work-item--managed" key={item.id}>
+              <div>
+                <strong>{item.title}</strong>
+                <span>{item.reason}</span>
+              </div>
+              <div className="uqi-work-item__meta">
+                <span>{item.area}</span>
+                <span>{item.priority}</span>
+                <span>{item.agency}</span>
+                <span>{item.actionWindow}</span>
+                <span>{item.confidenceText}</span>
+              </div>
+              <div className="uqi-workflow-controls">
+                {["Suggested", "Assigned", "In progress", "Completed"].map((status) => (
+                  <button
+                    className={item.status === status ? "is-active" : ""}
+                    type="button"
+                    key={status}
+                    onClick={() => updateStatus(item.id, status)}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
       <section className="uqi-panel">
         <PanelHeader eyebrow="Agency Coordination" title="Responsible teams" chip={enforcement.agencyStatus} />
@@ -1075,31 +1256,49 @@ function HealthAdvisoryPage({ context }) {
 }
 
 function AlertsPage({ context }) {
-  const points = getForecastPoints(context.decision?.forecast);
-  const alertable = points.filter((point) => asNumber(point.predictedAqi, -1) > 200 || point.fallbackReason);
+  const alerts = normalizeOperationalAlerts(context.decision);
+  const [severity, setSeverity] = useState("all");
+  const [agency, setAgency] = useState("all");
+  const severities = ["all", ...new Set(alerts.map((item) => item.severity).filter(Boolean))];
+  const agencies = ["all", ...new Set(alerts.map((item) => item.agency).filter(Boolean))];
+  const filteredAlerts = alerts.filter((item) => (severity === "all" || item.severity === severity) && (agency === "all" || item.agency === agency));
   return (
-    <UtilityPage
-      eyebrow="Alerts"
-      title="Alert readiness"
-      note="Alert candidates are derived from the current forecast response and fallback diagnostics. No notification is sent from this page."
-      items={alertable}
-      empty="No high-risk or fallback-driven alert candidates are present in the current response."
-      renderItem={(point) => (
-        <>
-          <strong>{point.key}: AQI {formatAqi(point.predictedAqi)}</strong>
-          <span>{engineLabel(point, context.decision?.forecast)} - {fallbackReasonLabel(point.fallbackReason || asArray(point.insufficiencyReasons)[0])}</span>
-          <details className="uqi-details">
-            <summary>Diagnostic detail</summary>
-            <dl className="uqi-definition-grid">
-              <div><dt>Horizon</dt><dd>{point.key}</dd></div>
-              <div><dt>Severity</dt><dd>{labelize(getAqiTone(point.predictedAqi), "Unavailable")}</dd></div>
-              <div><dt>Engine</dt><dd>{engineLabel(point, context.decision?.forecast)}</dd></div>
-              <div><dt>Reason</dt><dd>{fallbackReasonLabel(point.fallbackReason || asArray(point.insufficiencyReasons)[0])}</dd></div>
-            </dl>
-          </details>
-        </>
-      )}
-    />
+    <div className="uqi-page-stack">
+      <PageIntro
+        eyebrow="Alerts"
+        title="Operational watch desk"
+        note="Watch items are derived from current AQI, forecast, source evidence, area layers, and advisories. No notification is sent from this page."
+      />
+      <section className="uqi-panel uqi-alert-workbench">
+        <PanelHeader eyebrow="Filters" title="Watch items" chip={`${filteredAlerts.length} visible`} />
+        <div className="uqi-filter-row">
+          <label><span>Severity</span><select value={severity} onChange={(event) => setSeverity(event.target.value)}>{severities.map((item) => <option key={item} value={item}>{labelize(item)}</option>)}</select></label>
+          <label><span>Agency</span><select value={agency} onChange={(event) => setAgency(event.target.value)}>{agencies.map((item) => <option key={item} value={item}>{item === "all" ? "All agencies" : item}</option>)}</select></label>
+        </div>
+        {filteredAlerts.length === 0 ? <EmptyLine text="No watch items match the selected filters." /> : (
+          <div className="uqi-work-item-list">
+            {filteredAlerts.map((item) => (
+              <article className="uqi-work-item" key={item.id}>
+                <div>
+                  <strong>{item.title}</strong>
+                  <span>{item.reason}</span>
+                </div>
+                <div className="uqi-work-item__meta">
+                  <span>{item.type}</span>
+                  <span>{item.area}</span>
+                  <span>{item.severity}</span>
+                  <span>{item.agency}</span>
+                  <span>{item.status}</span>
+                  <span>{item.confidenceText}</span>
+                </div>
+                <p>{item.recommendedAction}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+      <SystemDataDiagnosticsCard decision={context.decision} timeline={context.timeline} />
+    </div>
   );
 }
 
@@ -1345,31 +1544,6 @@ function EnforcementSummaryCard({ decision }) {
       {!items.length && <p className="uqi-note">{moduleStatusReason(moduleStatus, "No enforcement actions were returned.")}</p>}
       <ActionList items={items} empty="No enforcement actions were returned." compact />
       <Link className="uqi-inline-action" to="/gov/enforcement">Open enforcement</Link>
-    </MotionCard>
-  );
-}
-
-function CollectorModelStatusCard({ decision, timeline }) {
-  const health = normalizeOperationalHealth(decision, timeline);
-  const diagnostic = toDisplayText(decision?.engineStatus?.message, "Core providers are online; optional model diagnostics are available below.");
-  return (
-    <MotionCard className="uqi-panel uqi-system-health-card">
-      <PanelHeader eyebrow="Collector and Model Status" title="Live engine health" chip={health.status} />
-      <div className="uqi-status-rows">
-        <span><i className="tone-low" /><b>Provider forecast</b><strong>{health.providerForecast}</strong></span>
-        <span><i className="tone-low" /><b>Forecast horizons</b><strong>{health.forecastHorizonCount}</strong></span>
-        <span><i className="tone-low" /><b>Timeline frames</b><strong>{health.timelineFrameCount}</strong></span>
-        <span><i className="tone-neutral" /><b>Optional AI model</b><strong>{health.optionalAiModel}</strong></span>
-      </div>
-      <p className="uqi-note uqi-line-clamp-3">{diagnostic}</p>
-      <details className="uqi-details uqi-compact-details">
-        <summary>View diagnostics</summary>
-        <dl className="uqi-definition-grid">
-          <div><dt>Locally promoted model horizons</dt><dd>{health.promotedHorizonCount}</dd></div>
-          <div><dt>Persistence fallback horizons</dt><dd>{health.persistenceFallbackHorizonCount}</dd></div>
-        </dl>
-        <p className="uqi-note">{diagnostic}</p>
-      </details>
     </MotionCard>
   );
 }

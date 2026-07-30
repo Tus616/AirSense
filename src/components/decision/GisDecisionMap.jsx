@@ -20,7 +20,7 @@ import { getGeoSpatialIntelligence } from "../../services/decisionApi";
 import { asArray, centerFromCity, GIS_LAYERS, labelize, toDisplayText } from "./decisionUtils";
 import { enumLabel } from "../../services/decisionNormalization";
 
-const DEFAULT_LAYERS = GIS_LAYERS.reduce((acc, layer) => ({ ...acc, [layer.id]: true }), {});
+const DEFAULT_LAYERS = GIS_LAYERS.reduce((acc, layer) => ({ ...acc, [layer.id]: layer.id === "hotspots" }), {});
 const OSM_TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
 L.Icon.Default.mergeOptions({
@@ -36,6 +36,7 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
   const [error, setError] = useState("");
   const [tileStatus, setTileStatus] = useState("idle");
   const [tileKey, setTileKey] = useState(0);
+  const [selectedFeature, setSelectedFeature] = useState(null);
   const requestRef = useRef(null);
   const shellRef = useRef(null);
 
@@ -219,7 +220,7 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
                       data={featureCollection(layer)}
                       pointToLayer={(feature, latlng) => pointToLayer(layer, feature, latlng)}
                       style={(feature) => featureStyle(layer, feature)}
-                      onEachFeature={(feature, leafletLayer) => bindFeatureInteractions(layer, feature, leafletLayer)}
+                      onEachFeature={(feature, leafletLayer) => bindFeatureInteractions(layer, feature, leafletLayer, setSelectedFeature)}
                     >
                       <Tooltip direction="top">{layerTooltip(layer)}</Tooltip>
                     </GeoJSON>
@@ -243,6 +244,9 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
           </>
         )}
       </div>
+      {selectedFeature && (
+        <FeatureIntelligencePanel feature={selectedFeature} onClose={() => setSelectedFeature(null)} />
+      )}
       {geoSpatial && (
         <p className="decision-panel__note" style={{ fontSize: "0.75rem", opacity: 0.7 }}>
           Tiles: OpenStreetMap
@@ -355,7 +359,7 @@ function layerTooltip(layer) {
   ].filter(Boolean).join(" | ");
 }
 
-function bindFeatureInteractions(layer, feature, leafletLayer) {
+function bindFeatureInteractions(layer, feature, leafletLayer, onSelect) {
   const props = feature?.properties || {};
   const title = props.riskLevel
     ? `${labelize(props.riskLevel)} risk`
@@ -367,6 +371,35 @@ function bindFeatureInteractions(layer, feature, leafletLayer) {
   ].filter(Boolean).join(" | ");
   leafletLayer.bindTooltip(tooltip);
   leafletLayer.bindPopup(featurePopupHtml(layer, props));
+  leafletLayer.on("click", () => onSelect?.({ layer, props }));
+}
+
+function FeatureIntelligencePanel({ feature, onClose }) {
+  const { layer, props } = feature;
+  const rows = [
+    ["Area", props.areaName || props.locality || props.zoneName || props.name],
+    ["Risk", props.riskLevel || props.severity],
+    ["AQI", props.aqi || props.currentAqi || props.forecastAqi || props.predictedAqi],
+    ["Likely source", props.likelySource || props.source],
+    ["Action", props.recommendedAction || props.recommendation],
+    ["Agency", props.agency || props.responsibleAgency],
+    ["Evidence", props.reason || props.evidenceSummary || props.dominantEvidence || props.datasetsUsed],
+    ["Confidence", props.confidence != null ? `${Math.round(Number(props.confidence) * 100)}%` : ""],
+  ].filter(([, value]) => value !== null && value !== undefined && value !== "");
+  return (
+    <aside className="decision-feature-panel" aria-label="Selected map feature">
+      <div>
+        <span className="decision-eyebrow">Selected Feature</span>
+        <strong>{labelize(layer?.displayName || layer?.layerType, "Map feature")}</strong>
+      </div>
+      <button className="decision-button" type="button" onClick={onClose}>Close</button>
+      <dl>
+        {rows.map(([label, value]) => (
+          <div key={label}><dt>{label}</dt><dd>{toDisplayText(value)}</dd></div>
+        ))}
+      </dl>
+    </aside>
+  );
 }
 
 function featurePopupHtml(layer, props) {

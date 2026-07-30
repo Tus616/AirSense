@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  buildSituationSummary,
   enumLabel,
+  normalizeActionQueue,
+  normalizeAreaIntelligence,
   normalizeAttribution,
   normalizeEnforcement,
   normalizeForecast,
+  normalizeOperationalAlerts,
   normalizeOperationalHealth,
   normalizeRiskDecision,
 } from "../src/services/decisionNormalization.js";
@@ -35,6 +39,15 @@ const decision = {
     failureReasons: {},
   },
   environmentalSignals: { aqiAvailable: true },
+  geospatial: {
+    layers: [{
+      layerType: "AQI_HOTSPOTS",
+      features: [
+        { properties: { areaName: "Industrial Estate", aqi: 156, riskLevel: "HIGH", likelySource: "Industrial activity", recommendedAction: "Inspect emissions", agency: "Pollution Control Board", confidence: 0.6 } },
+        { properties: { areaName: "Central Market", aqi: 91, riskLevel: "MODERATE", likelySource: "Traffic", recommendedAction: "Retune signals", agency: "Traffic Police", confidence: 0.5 } },
+      ],
+    }],
+  },
   enforcement: {
     recommendations: [{
       actionType: "MONITORING",
@@ -110,6 +123,29 @@ assert.equal(attribution.leadingSource.contributionText, "16%");
 assert.equal(attribution.confidenceText, "28%");
 assert.equal(attribution.totalContribution, 100);
 assert.equal(attribution.sources.find((source) => source.sourceType === "UNKNOWN").sourceLabel, "Unknown / insufficiently explained");
+
+const areas = normalizeAreaIntelligence(decision);
+assert.equal(areas[0].area, "Industrial Estate");
+assert.equal(areas[0].priority, "High");
+assert.equal(areas[0].agency, "Pollution Control Board");
+assert.equal(areas[1].area, "Central Market");
+
+const actions = normalizeActionQueue(decision);
+assert.equal(actions[0].title, "Continue monitoring");
+assert.equal(actions[0].agency, "No agency escalation required");
+assert.equal(actions[0].status, "Suggested");
+
+const alerts = normalizeOperationalAlerts(decision);
+assert.ok(alerts.some((item) => item.type === "Current AQI"));
+assert.ok(alerts.some((item) => item.type === "Forecast"));
+assert.equal(alerts.some((item) => /fallback|chronos|model/i.test(`${item.title} ${item.reason} ${item.recommendedAction}`)), false);
+
+const situation = buildSituationSummary(decision);
+assert.ok(situation.what.includes("AQI 80"));
+assert.equal(situation.where, "Industrial Estate");
+assert.ok(situation.forecast.includes("peak forecast AQI 78"));
+assert.equal(/OPEN_METEO|CHRONOS|PERSISTENCE|fallback/i.test(Object.values(situation).join(" ")), false);
+assert.equal(readFileSync(new URL("../src/pages/DecisionDashboard.jsx", import.meta.url), "utf8").includes("Collector and Model Status"), false);
 
 const labels = [
   enumLabel("NO_ACTION_REQUIRED"),

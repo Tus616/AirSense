@@ -213,3 +213,246 @@ export function normalizeAttribution(attribution) {
     confidence: attribution?.overallConfidence,
   };
 }
+
+function firstText(values, fallback = "Evidence not available") {
+  const value = values.find((item) => item !== null && item !== undefined && item !== "");
+  return value === undefined ? fallback : String(value);
+}
+
+function actionTitle(item, fallback = "Continue monitoring") {
+  return firstText([
+    item?.title,
+    item?.actionLabel,
+    item?.name,
+    enumLabel(item?.actionType || item?.action, ""),
+  ], fallback);
+}
+
+function actionReason(item, fallback = "Current evidence supports routine monitoring.") {
+  return firstText([
+    item?.reason,
+    item?.description,
+    item?.message,
+    item?.summary,
+    array(item?.recommendedActions).join("; "),
+  ], fallback);
+}
+
+function featureCollection(layer) {
+  return array(layer?.geoJson?.features).length > 0 ? array(layer.geoJson.features) : array(layer?.features);
+}
+
+function decisionLayers(decision) {
+  return array(decision?.geospatial?.layers)
+    .concat(array(decision?.geoSpatial?.layers))
+    .concat(array(decision?.geoSpatialIntelligence?.layers));
+}
+
+function priorityScore(level, aqi) {
+  const risk = String(level || "").toUpperCase();
+  if (["EMERGENCY", "SEVERE", "CRITICAL", "HAZARDOUS"].includes(risk)) return 5;
+  if (["HIGH", "VERY_POOR", "VERY HIGH", "UNHEALTHY"].includes(risk)) return 4;
+  if (["ELEVATED", "MODERATE", "POOR"].includes(risk)) return 3;
+  const value = numberOrNull(aqi);
+  if (value === null) return 1;
+  if (value > 300) return 5;
+  if (value > 200) return 4;
+  if (value > 100) return 3;
+  if (value > 50) return 2;
+  return 1;
+}
+
+function priorityLabel(score) {
+  if (score >= 5) return "Critical";
+  if (score >= 4) return "High";
+  if (score >= 3) return "Medium";
+  return "Low";
+}
+
+export function normalizeAreaIntelligence(decision) {
+  const forecast = normalizeForecast(decision?.forecast);
+  const risk = normalizeRiskDecision(decision);
+  const attribution = normalizeAttribution(decision?.attribution);
+  const enforcement = normalizeEnforcement(decision);
+  const hotspotRows = decisionLayers(decision)
+    .filter((layer) => String(layer?.layerType || layer?.layerId || "").includes("HOTSPOT"))
+    .flatMap((layer) => featureCollection(layer).map((feature, index) => {
+      const props = feature?.properties || {};
+      const aqi = numberOrNull(props.aqi ?? props.currentAqi ?? props.forecastAqi ?? props.predictedAqi ?? risk.currentAqi);
+      const score = priorityScore(props.riskLevel || props.severity, aqi);
+      return {
+        id: props.id || props.areaId || `${layer.layerId || layer.layerType || "hotspot"}-${index}`,
+        area: firstText([props.areaName, props.locality, props.zoneName, props.name, props.label], "Unnamed hotspot"),
+        currentAqi: aqi,
+        riskLevel: enumLabel(props.riskLevel || props.severity, aqiRiskLabel(aqi)),
+        forecast: props.forecastAqi || props.predictedAqi ? `Expected AQI ${Math.round(Number(props.forecastAqi || props.predictedAqi))}` : forecast.available ? `Peak ${risk.peakForecastAqi ?? "unavailable"} AQI` : "Forecast evidence not available",
+        likelySource: firstText([props.likelySource, props.source, attribution.leadingSource?.sourceLabel], "Source evidence not available"),
+        affectedPeople: firstText([props.affectedPopulation, props.populationExposed, props.population, props.sensitiveReceivers], "Exposure estimate not available"),
+        recommendedAction: firstText([props.recommendedAction, props.recommendation, props.action, enforcement.title], "Continue monitoring"),
+        agency: firstText([props.agency, props.responsibleAgency, enforcement.agencies[0]], enforcement.agencyStatus),
+        evidence: firstText([props.reason, props.evidenceSummary, props.dominantEvidence, props.datasetsUsed], "Hotspot geometry returned without a detailed evidence note."),
+        status: "Suggested",
+        priority: priorityLabel(score),
+        priorityScore: score,
+      };
+    }));
+
+  const rows = hotspotRows.length > 0 ? hotspotRows : [{
+    id: "selected-area",
+    area: firstText([
+      decision?.forecast?.stationName,
+      decision?.environmentalSignals?.stationName,
+      decision?.city?.displayName,
+      decision?.cityName,
+    ], "Selected area"),
+    currentAqi: risk.currentAqi,
+    riskLevel: risk.riskLevel,
+    forecast: forecast.available ? `Peak ${risk.peakForecastAqi ?? "unavailable"} AQI over ${forecast.horizonCount} horizons` : "Forecast evidence not available",
+    likelySource: attribution.leadingSource?.sourceLabel || "Source evidence not available",
+    affectedPeople: "Exposure estimate not available",
+    recommendedAction: enforcement.title,
+    agency: enforcement.agencyStatus,
+    evidence: risk.decisionSummary,
+    status: "Monitoring",
+    priority: enforcement.priority,
+    priorityScore: priorityScore(enforcement.priority, risk.currentAqi),
+  }];
+
+  return rows.sort((a, b) => b.priorityScore - a.priorityScore);
+}
+
+export function normalizeActionQueue(decision) {
+  const enforcement = normalizeEnforcement(decision);
+  const areaRows = normalizeAreaIntelligence(decision);
+  const candidates = enforcement.recommendations.length > 0
+    ? enforcement.recommendations
+    : array(decision?.priorityActions);
+  const rows = candidates.map((item, index) => ({
+    id: item?.id || item?.actionId || `action-${index}`,
+    title: actionTitle(item, enforcement.title),
+    priority: enumLabel(item?.priorityLevel || item?.priority || enforcement.priority, enforcement.priority),
+    agency: firstText([item?.responsibleAgency, item?.agency, enforcement.agencies[0]], enforcement.agencyStatus),
+    area: firstText([item?.area, item?.zone, item?.locality, areaRows[0]?.area], "Selected area"),
+    status: enumLabel(item?.status, "Suggested"),
+    actionWindow: firstText([item?.actionWindow, item?.deadline, item?.timeWindow], enforcement.actionWindow),
+    reason: actionReason(item, enforcement.reason),
+    confidenceText: percentText(item?.confidence ?? enforcement.confidence),
+  }));
+
+  if (rows.length > 0) return rows;
+  return [{
+    id: "routine-monitoring",
+    title: enforcement.title || "Continue monitoring",
+    priority: enforcement.priority || "Low",
+    agency: enforcement.agencyStatus,
+    area: areaRows[0]?.area || "Selected area",
+    status: "Monitoring",
+    actionWindow: enforcement.actionWindow,
+    reason: enforcement.reason,
+    confidenceText: enforcement.confidenceText,
+  }];
+}
+
+export function normalizeOperationalAlerts(decision) {
+  const forecast = normalizeForecast(decision?.forecast);
+  const risk = normalizeRiskDecision(decision);
+  const attribution = normalizeAttribution(decision?.attribution);
+  const areaRows = normalizeAreaIntelligence(decision);
+  const alerts = [];
+  const peakForecast = risk.peakForecastAqi;
+  const currentAqi = risk.currentAqi;
+
+  if (currentAqi !== null) {
+    alerts.push({
+      id: "current-condition",
+      type: "Current AQI",
+      title: `${aqiRiskLabel(currentAqi)} air quality now`,
+      severity: aqiRiskLabel(currentAqi),
+      area: areaRows[0]?.area || "Selected area",
+      agency: areaRows[0]?.agency || "Operations desk",
+      status: currentAqi > 100 ? "Active watch" : "Monitoring",
+      reason: `Current AQI is ${Math.round(currentAqi)}.`,
+      recommendedAction: areaRows[0]?.recommendedAction || "Continue monitoring",
+      confidenceText: risk.available ? "Observed evidence" : "Evidence not available",
+    });
+  }
+
+  if (forecast.available) {
+    const highest = forecast.validPoints
+      .slice()
+      .sort((a, b) => (numberOrNull(b.predictedAqi) ?? -1) - (numberOrNull(a.predictedAqi) ?? -1))[0];
+    alerts.push({
+      id: "forecast-outlook",
+      type: "Forecast",
+      title: `${aqiRiskLabel(peakForecast)} forecast outlook`,
+      severity: aqiRiskLabel(peakForecast),
+      area: areaRows[0]?.area || "Selected area",
+      agency: "Forecast desk",
+      status: peakForecast > currentAqi ? "Watch" : "Monitoring",
+      reason: highest ? `${highest.key} forecast AQI is ${Math.round(numberOrNull(highest.predictedAqi) ?? 0)}.` : "Forecast horizon evidence is available.",
+      recommendedAction: peakForecast > 100 ? "Prepare public advisory and review enforcement queue." : "Continue routine monitoring.",
+      confidenceText: percentText(highest?.confidence),
+      horizon: highest?.key,
+    });
+  }
+
+  if (attribution.leadingSource) {
+    alerts.push({
+      id: "source-analysis",
+      type: "Source",
+      title: `${attribution.leadingSource.sourceLabel} is the leading explained source`,
+      severity: attribution.leadingSource.contribution >= 30 ? "Elevated" : "Watch",
+      area: areaRows[0]?.area || "Selected area",
+      agency: areaRows[0]?.agency || "Agency assignment pending",
+      status: "Suggested",
+      reason: `${attribution.leadingSource.contributionText} contribution with ${attribution.leadingSource.confidenceText} confidence.`,
+      recommendedAction: areaRows[0]?.recommendedAction || "Review source evidence.",
+      confidenceText: attribution.leadingSource.confidenceText,
+    });
+  }
+
+  areaRows.slice(0, 3).forEach((area, index) => {
+    if (area.id === "selected-area") return;
+    alerts.push({
+      id: `area-${area.id || index}`,
+      type: "Area",
+      title: `${area.area} needs attention`,
+      severity: area.riskLevel,
+      area: area.area,
+      agency: area.agency,
+      status: area.status,
+      reason: area.evidence,
+      recommendedAction: area.recommendedAction,
+      confidenceText: "Layer evidence",
+    });
+  });
+
+  return alerts;
+}
+
+export function buildSituationSummary(decision) {
+  const forecast = normalizeForecast(decision?.forecast);
+  const risk = normalizeRiskDecision(decision);
+  const attribution = normalizeAttribution(decision?.attribution);
+  const enforcement = normalizeEnforcement(decision);
+  const areas = normalizeAreaIntelligence(decision);
+  const alerts = normalizeOperationalAlerts(decision);
+  const peakText = risk.peakForecastAqi == null ? "forecast unavailable" : `peak forecast AQI ${Math.round(risk.peakForecastAqi)}`;
+  const sourceText = attribution.leadingSource
+    ? `${attribution.leadingSource.sourceLabel} (${attribution.leadingSource.contributionText}, ${attribution.leadingSource.confidenceText} confidence)`
+    : "source evidence unavailable";
+  return {
+    what: risk.currentAqi == null ? "Current air quality evidence is not available." : `${aqiRiskLabel(risk.currentAqi)} air quality now, AQI ${Math.round(risk.currentAqi)}.`,
+    where: areas[0]?.area || "Selected area",
+    why: sourceText,
+    forecast: forecast.available ? `${risk.trend}; ${peakText}.` : "Forecast evidence not available.",
+    affected: areas[0]?.affectedPeople || "Exposure estimate not available",
+    action: enforcement.title,
+    agency: enforcement.agencyStatus,
+    evidence: forecast.available ? `${forecast.horizonCount} forecast horizons, ${attribution.sources.length} source rows, ${areas.length} area row${areas.length === 1 ? "" : "s"}.` : `${attribution.sources.length} source rows, ${areas.length} area row${areas.length === 1 ? "" : "s"}.`,
+    status: alerts.length > 0 ? `${alerts.length} operational watch item${alerts.length === 1 ? "" : "s"}` : "No active watch items",
+    currentAqi: risk.currentAqi,
+    peakForecastAqi: risk.peakForecastAqi,
+    trend: risk.trend,
+  };
+}
