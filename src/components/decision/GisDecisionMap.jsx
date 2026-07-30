@@ -29,7 +29,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
+export default function GisDecisionMap({ city, geoSpatialOverride, snapshot, activeSnapshot }) {
   const [layers, setLayers] = useState(DEFAULT_LAYERS);
   const [geoSpatial, setGeoSpatial] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -104,24 +104,62 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
     () => asArray(geoSpatial?.layers).filter((layer) => visibleLayerTypes.has(layer.layerType || layer.layerId)),
     [geoSpatial, visibleLayerTypes]
   );
-  const hotspotFeatureCount = useMemo(
-    () => backendLayers
-      .filter((layer) => String(layer.layerType || layer.layerId) === "AQI_HOTSPOTS")
-      .reduce((count, layer) => count + featureCollection(layer).features.length, 0),
-    [backendLayers],
-  );
 
   const center = useMemo(() => {
     const backendCenter = geoSpatial?.metadata?.center;
     if (backendCenter?.latitude && backendCenter?.longitude) {
       return [Number(backendCenter.latitude), Number(backendCenter.longitude)];
     }
+    if (activeSnapshot?.coordinates?.latitude && activeSnapshot?.coordinates?.longitude) {
+      return [Number(activeSnapshot.coordinates.latitude), Number(activeSnapshot.coordinates.longitude)];
+    }
     const fallback = centerFromCity(city);
     return fallback ? [fallback.lat, fallback.lng] : null;
-  }, [geoSpatial, city]);
+  }, [geoSpatial, activeSnapshot, city]);
 
   const snapshotSignals = snapshot?.environmentalSignals || {};
   const snapshotStatus = snapshotSignals.aqiAvailable ? "Live evidence" : "Evidence not available";
+  const selectedArea = activeSnapshot?.areas?.[0] || null;
+  const derivedMonitoringLayer = useMemo(() => {
+    if (!center || !layers.hotspots) return null;
+    const hasBackendHotspot = backendLayers
+      .filter((layer) => String(layer.layerType || layer.layerId) === "AQI_HOTSPOTS")
+      .some((layer) => featureCollection(layer).features.length > 0);
+    if (hasBackendHotspot) return null;
+    return {
+      layerId: "DERIVED_MONITORING_ZONE",
+      layerType: "AQI_HOTSPOTS",
+      displayName: "Derived monitoring zone",
+      features: [{
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [center[1], center[0]] },
+        properties: {
+          name: "Derived monitoring zone",
+          areaName: selectedArea?.area || "Selected station area",
+          aqi: activeSnapshot?.currentAqi,
+          forecastAqi: activeSnapshot?.forecast?.validPoints?.reduce((max, point) => Math.max(max, Number(point.predictedAqi) || 0), 0) || undefined,
+          riskLevel: selectedArea?.riskLevel,
+          likelySource: selectedArea?.likelySource,
+          sensitiveReceivers: selectedArea?.affectedPeople,
+          recommendedAction: selectedArea?.recommendedAction,
+          agency: selectedArea?.agency,
+          confidence: activeSnapshot?.attribution?.confidence,
+          evidenceSummary: "Derived from the selected station and active decision snapshot; precise hotspot geometry was not returned.",
+          radiusMeters: 1800,
+        },
+      }],
+    };
+  }, [activeSnapshot, backendLayers, center, layers.hotspots, selectedArea]);
+  const renderedLayers = useMemo(
+    () => derivedMonitoringLayer ? [...backendLayers, derivedMonitoringLayer] : backendLayers,
+    [backendLayers, derivedMonitoringLayer],
+  );
+  const hotspotFeatureCount = useMemo(
+    () => renderedLayers
+      .filter((layer) => String(layer.layerType || layer.layerId) === "AQI_HOTSPOTS")
+      .reduce((count, layer) => count + featureCollection(layer).features.length, 0),
+    [renderedLayers],
+  );
 
   const toggleLayer = (layerId) => {
     setLayers((current) => ({ ...current, [layerId]: !current[layerId] }));
@@ -169,12 +207,8 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
         ))}
       </div>
       <p className="decision-panel__note">
-        Snapshot: {toDisplayText(snapshot?.snapshotId, "unavailable")}
-        {" | "}Location: {toDisplayText(snapshot?.locationHash, "unavailable")}
-        {" | "}AQI source: {toDisplayText(snapshotSignals.stationName, "source unavailable")}
-          {" | "}Observed: {toDisplayText(snapshotSignals.observedAt, "unavailable")}
-          {" | "}Fetched: {toDisplayText(snapshot?.generatedAt, "unavailable")}
-        {" | "}Status: {snapshotStatus}
+        Operational view for {toDisplayText(snapshotSignals.stationName || activeSnapshot?.station?.name, "the selected station")}.
+        {" "}Default layers show the selected location, station area, and active monitoring zone. Status: {snapshotStatus}.
       </p>
 
       <div className="decision-map-shell" ref={shellRef}>
@@ -214,7 +248,7 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
                     </Marker>
                   </LayerGroup>
                 </LayersControl.Overlay>
-                {backendLayers.map((layer) => (
+                {renderedLayers.map((layer) => (
                   <LayersControl.Overlay checked name={labelize(layer.displayName || layer.layerType || layer.layerId, "Layer")} key={`${snapshot?.snapshotId || geoSpatial?.generatedAt || "live"}-${layer.layerId || layer.layerType}`}>
                     <GeoJSON
                       data={featureCollection(layer)}
@@ -248,13 +282,18 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
         <FeatureIntelligencePanel feature={selectedFeature} onClose={() => setSelectedFeature(null)} />
       )}
       {geoSpatial && (
-        <p className="decision-panel__note" style={{ fontSize: "0.75rem", opacity: 0.7 }}>
-          Tiles: OpenStreetMap
-          {" | "}Geometry: {toDisplayText(geoSpatial.geometrySource, "unavailable")}
-          {geoSpatial.degradedMode ? " | Layer note: some optional layer geometries are limited" : ""}
-          {" | "}Layers: {asArray(geoSpatial.layers).length}
-          {" | "}Confidence: {toDisplayText(geoSpatial.summary?.confidence, "unavailable")}
-        </p>
+        <details className="uqi-details decision-map-diagnostics">
+          <summary>System & Data Diagnostics</summary>
+          <p className="decision-panel__note" style={{ fontSize: "0.75rem", opacity: 0.7 }}>
+            Tiles: OpenStreetMap
+            {" | "}Snapshot: {toDisplayText(snapshot?.snapshotId, "not reported")}
+            {" | "}Location: {toDisplayText(snapshot?.locationHash, "not reported")}
+            {" | "}Geometry: {toDisplayText(geoSpatial.geometrySource, "not reported")}
+            {geoSpatial.degradedMode ? " | Layer note: some optional layer geometries are limited" : ""}
+            {" | "}Layers: {asArray(geoSpatial.layers).length}
+            {" | "}Confidence: {toDisplayText(geoSpatial.summary?.confidence, "not reported")}
+          </p>
+        </details>
       )}
     </section>
   );
@@ -321,13 +360,14 @@ function pointToLayer(layer, feature, latlng) {
   const props = feature?.properties || {};
   const radiusMeters = Number(props.radiusMeters);
   if (Number.isFinite(radiusMeters) && radiusMeters > 0) {
+    const isHotspot = String(layer?.layerType || layer?.layerId || "").includes("HOTSPOT");
     return L.circle(latlng, {
       radius: radiusMeters,
       color: colorFor(layer, props),
       opacity: 0.9,
-      weight: 2,
+      weight: isHotspot ? 4 : 2,
       fillColor: colorFor(layer, props),
-      fillOpacity: 0.22,
+      fillOpacity: isHotspot ? 0.34 : 0.22,
     });
   }
   return L.circleMarker(latlng, {

@@ -34,7 +34,7 @@ export function enumLabel(value, fallback = "Evidence not available") {
     UNKNOWN: "Unknown / insufficiently explained",
     CHRONOS_DISABLED: "Optional AI model not used",
     UNAVAILABLE: fallback,
-    NOT_REQUIRED: "No agency escalation required",
+    NOT_REQUIRED: "Air Quality Command Center",
     PENDING: "Agency assignment pending",
     ASSIGNED: "Agency assigned",
     LOW: "Low",
@@ -174,12 +174,21 @@ export function normalizeEnforcement(decision) {
     confidenceText: percentText(confidence),
     confidence,
     agencies: noAgencyRequired ? [] : [...new Set(agencies)],
-    agencyStatus: noAgencyRequired ? "No agency escalation required" : agencies.length > 0 ? `${agencies.length} agency${agencies.length === 1 ? "" : "ies"}` : "Agency assignment pending",
+    agencyStatus: noAgencyRequired ? "Air Quality Command Center" : agencies.length > 0 ? `${agencies.length} agency${agencies.length === 1 ? "" : "ies"}` : "Air Quality Command Center",
     actionWindow: top.actionWindow || "Next 24 hours",
     forecastAvailable: Boolean(top.forecastAvailable) || normalizeForecast(decision?.forecast).available,
     reason: top.reason || "Current and forecast evidence support routine monitoring.",
     recommendedActions: array(top.recommendedActions),
   };
+}
+
+function cleanSentence(value, fallback = "Evidence not available") {
+  const text = firstText([value], fallback)
+    .replace(/\s+/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .replace(/([.!?])(?=\S)/g, "$1 ")
+    .trim();
+  return text || fallback;
 }
 
 export function normalizeAttribution(attribution) {
@@ -229,13 +238,13 @@ function actionTitle(item, fallback = "Continue monitoring") {
 }
 
 function actionReason(item, fallback = "Current evidence supports routine monitoring.") {
-  return firstText([
+  return cleanSentence(firstText([
     item?.reason,
     item?.description,
     item?.message,
     item?.summary,
     array(item?.recommendedActions).join("; "),
-  ], fallback);
+  ], fallback), fallback);
 }
 
 function featureCollection(layer) {
@@ -269,6 +278,39 @@ function priorityLabel(score) {
   return "Low";
 }
 
+function responsibleUnit(value, fallback = "Air Quality Command Center") {
+  const text = firstText([value], fallback);
+  const key = text.toUpperCase();
+  if (!text || key === "NOT_REQUIRED" || key.includes("NO AGENCY ESCALATION")) return fallback;
+  if (key.includes("TRAFFIC")) return "Traffic Police";
+  if (key.includes("POLLUTION") || key.includes("INDUSTRIAL")) return "Pollution Control Board";
+  if (key.includes("HEALTH") || key.includes("HOSPITAL")) return "Public Health Department";
+  if (key.includes("MUNICIPAL")) return "Municipal Corporation";
+  return text;
+}
+
+function unknownContribution(attribution) {
+  return normalizeAttribution(attribution).sources.find((source) => {
+    const key = String(source.sourceType || source.displayName || "").toUpperCase();
+    return key === "UNKNOWN" || key.includes("UNKNOWN");
+  });
+}
+
+function sensitiveLocationSummary(props = {}, decision = {}) {
+  const schoolCount = numberOrNull(props.schoolCount ?? props.schoolsCount ?? decision?.geospatial?.summary?.schoolCount);
+  const hospitalCount = numberOrNull(props.hospitalCount ?? props.hospitalsCount ?? decision?.geospatial?.summary?.hospitalCount);
+  const groups = array(props.vulnerableGroups || decision?.advisories?.vulnerableGroups || decision?.advisories?.sensitiveGroups)
+    .map((item) => firstText([item?.label, item?.name, item], ""))
+    .filter(Boolean);
+  const parts = [];
+  if (schoolCount !== null) parts.push(`${schoolCount} school${schoolCount === 1 ? "" : "s"}`);
+  if (hospitalCount !== null) parts.push(`${hospitalCount} hospital${hospitalCount === 1 ? "" : "s"}`);
+  if (groups.length > 0) parts.push(`${groups.slice(0, 3).join(", ")} groups`);
+  return parts.length > 0
+    ? parts.join(", ")
+    : "Sensitive locations and vulnerable groups are shown; population exposure estimation is not yet connected.";
+}
+
 export function normalizeAreaIntelligence(decision) {
   const forecast = normalizeForecast(decision?.forecast);
   const risk = normalizeRiskDecision(decision);
@@ -287,9 +329,9 @@ export function normalizeAreaIntelligence(decision) {
         riskLevel: enumLabel(props.riskLevel || props.severity, aqiRiskLabel(aqi)),
         forecast: props.forecastAqi || props.predictedAqi ? `Expected AQI ${Math.round(Number(props.forecastAqi || props.predictedAqi))}` : forecast.available ? `Peak ${risk.peakForecastAqi ?? "unavailable"} AQI` : "Forecast evidence not available",
         likelySource: firstText([props.likelySource, props.source, attribution.leadingSource?.sourceLabel], "Source evidence not available"),
-        affectedPeople: firstText([props.affectedPopulation, props.populationExposed, props.population, props.sensitiveReceivers], "Exposure estimate not available"),
+        affectedPeople: firstText([props.affectedPopulation, props.populationExposed, props.population, props.sensitiveReceivers, sensitiveLocationSummary(props, decision)], "Sensitive locations and vulnerable groups are shown; population exposure estimation is not yet connected."),
         recommendedAction: firstText([props.recommendedAction, props.recommendation, props.action, enforcement.title], "Continue monitoring"),
-        agency: firstText([props.agency, props.responsibleAgency, enforcement.agencies[0]], enforcement.agencyStatus),
+        agency: responsibleUnit(props.agency || props.responsibleAgency || enforcement.agencies[0], enforcement.agencyStatus),
         evidence: firstText([props.reason, props.evidenceSummary, props.dominantEvidence, props.datasetsUsed], "Hotspot geometry returned without a detailed evidence note."),
         status: "Suggested",
         priority: priorityLabel(score),
@@ -309,10 +351,10 @@ export function normalizeAreaIntelligence(decision) {
     riskLevel: risk.riskLevel,
     forecast: forecast.available ? `Peak ${risk.peakForecastAqi ?? "unavailable"} AQI over ${forecast.horizonCount} horizons` : "Forecast evidence not available",
     likelySource: attribution.leadingSource?.sourceLabel || "Source evidence not available",
-    affectedPeople: "Exposure estimate not available",
+    affectedPeople: sensitiveLocationSummary({}, decision),
     recommendedAction: enforcement.title,
-    agency: enforcement.agencyStatus,
-    evidence: risk.decisionSummary,
+    agency: responsibleUnit(enforcement.agencyStatus),
+    evidence: cleanSentence(risk.decisionSummary),
     status: "Monitoring",
     priority: enforcement.priority,
     priorityScore: priorityScore(enforcement.priority, risk.currentAqi),
@@ -331,7 +373,7 @@ export function normalizeActionQueue(decision) {
     id: item?.id || item?.actionId || `action-${index}`,
     title: actionTitle(item, enforcement.title),
     priority: enumLabel(item?.priorityLevel || item?.priority || enforcement.priority, enforcement.priority),
-    agency: firstText([item?.responsibleAgency, item?.agency, enforcement.agencies[0]], enforcement.agencyStatus),
+    agency: responsibleUnit(item?.responsibleAgency || item?.agency || enforcement.agencies[0], enforcement.agencyStatus),
     area: firstText([item?.area, item?.zone, item?.locality, areaRows[0]?.area], "Selected area"),
     status: enumLabel(item?.status, "Suggested"),
     actionWindow: firstText([item?.actionWindow, item?.deadline, item?.timeWindow], enforcement.actionWindow),
@@ -344,7 +386,7 @@ export function normalizeActionQueue(decision) {
     id: "routine-monitoring",
     title: enforcement.title || "Continue monitoring",
     priority: enforcement.priority || "Low",
-    agency: enforcement.agencyStatus,
+    agency: responsibleUnit(enforcement.agencyStatus),
     area: areaRows[0]?.area || "Selected area",
     status: "Monitoring",
     actionWindow: enforcement.actionWindow,
@@ -369,11 +411,14 @@ export function normalizeOperationalAlerts(decision) {
       title: `${aqiRiskLabel(currentAqi)} air quality now`,
       severity: aqiRiskLabel(currentAqi),
       area: areaRows[0]?.area || "Selected area",
-      agency: areaRows[0]?.agency || "Operations desk",
-      status: currentAqi > 100 ? "Active watch" : "Monitoring",
+      agency: responsibleUnit(areaRows[0]?.agency, "Air Quality Command Center"),
+      status: "New",
       reason: `Current AQI is ${Math.round(currentAqi)}.`,
+      currentAqi,
+      forecastAqi: peakForecast,
       recommendedAction: areaRows[0]?.recommendedAction || "Continue monitoring",
-      confidenceText: risk.available ? "Observed evidence" : "Evidence not available",
+      confidenceText: risk.available ? "Current AQI evidence available" : "Evidence not available",
+      createdAt: decision?.generatedAt,
     });
   }
 
@@ -387,12 +432,15 @@ export function normalizeOperationalAlerts(decision) {
       title: `${aqiRiskLabel(peakForecast)} forecast outlook`,
       severity: aqiRiskLabel(peakForecast),
       area: areaRows[0]?.area || "Selected area",
-      agency: "Forecast desk",
-      status: peakForecast > currentAqi ? "Watch" : "Monitoring",
+      agency: "Air Quality Command Center",
+      status: "New",
       reason: highest ? `${highest.key} forecast AQI is ${Math.round(numberOrNull(highest.predictedAqi) ?? 0)}.` : "Forecast horizon evidence is available.",
+      currentAqi,
+      forecastAqi: numberOrNull(highest?.predictedAqi),
       recommendedAction: peakForecast > 100 ? "Prepare public advisory and review enforcement queue." : "Continue routine monitoring.",
       confidenceText: percentText(highest?.confidence),
       horizon: highest?.key,
+      createdAt: decision?.generatedAt,
     });
   }
 
@@ -403,11 +451,14 @@ export function normalizeOperationalAlerts(decision) {
       title: `${attribution.leadingSource.sourceLabel} is the leading explained source`,
       severity: attribution.leadingSource.contribution >= 30 ? "Elevated" : "Watch",
       area: areaRows[0]?.area || "Selected area",
-      agency: areaRows[0]?.agency || "Agency assignment pending",
-      status: "Suggested",
+      agency: responsibleUnit(areaRows[0]?.agency),
+      status: "New",
       reason: `${attribution.leadingSource.contributionText} contribution with ${attribution.leadingSource.confidenceText} confidence.`,
+      currentAqi,
+      forecastAqi: peakForecast,
       recommendedAction: areaRows[0]?.recommendedAction || "Review source evidence.",
       confidenceText: attribution.leadingSource.confidenceText,
+      createdAt: decision?.generatedAt,
     });
   }
 
@@ -420,10 +471,13 @@ export function normalizeOperationalAlerts(decision) {
       severity: area.riskLevel,
       area: area.area,
       agency: area.agency,
-      status: area.status,
+      status: "New",
       reason: area.evidence,
+      currentAqi: area.currentAqi,
+      forecastAqi: peakForecast,
       recommendedAction: area.recommendedAction,
       confidenceText: "Layer evidence",
+      createdAt: decision?.generatedAt,
     });
   });
 
@@ -437,9 +491,10 @@ export function buildSituationSummary(decision) {
   const enforcement = normalizeEnforcement(decision);
   const areas = normalizeAreaIntelligence(decision);
   const alerts = normalizeOperationalAlerts(decision);
+  const unknown = unknownContribution(decision?.attribution);
   const peakText = risk.peakForecastAqi == null ? "forecast unavailable" : `peak forecast AQI ${Math.round(risk.peakForecastAqi)}`;
   const sourceText = attribution.leadingSource
-    ? `${attribution.leadingSource.sourceLabel} (${attribution.leadingSource.contributionText}, ${attribution.leadingSource.confidenceText} confidence)`
+    ? `${attribution.leadingSource.sourceLabel} is the leading explained source at ${attribution.leadingSource.contributionText} contribution with ${attribution.leadingSource.confidenceText} source-specific confidence. Overall attribution confidence is ${attribution.confidenceText}${unknown ? `, and ${unknown.contributionText} remains unexplained` : ""}.`
     : "source evidence unavailable";
   return {
     what: risk.currentAqi == null ? "Current air quality evidence is not available." : `${aqiRiskLabel(risk.currentAqi)} air quality now, AQI ${Math.round(risk.currentAqi)}.`,
@@ -448,11 +503,70 @@ export function buildSituationSummary(decision) {
     forecast: forecast.available ? `${risk.trend}; ${peakText}.` : "Forecast evidence not available.",
     affected: areas[0]?.affectedPeople || "Exposure estimate not available",
     action: enforcement.title,
-    agency: enforcement.agencyStatus,
+    agency: responsibleUnit(enforcement.agencyStatus),
     evidence: forecast.available ? `${forecast.horizonCount} forecast horizons, ${attribution.sources.length} source rows, ${areas.length} area row${areas.length === 1 ? "" : "s"}.` : `${attribution.sources.length} source rows, ${areas.length} area row${areas.length === 1 ? "" : "s"}.`,
     status: alerts.length > 0 ? `${alerts.length} operational watch item${alerts.length === 1 ? "" : "s"}` : "No active watch items",
     currentAqi: risk.currentAqi,
     peakForecastAqi: risk.peakForecastAqi,
     trend: risk.trend,
+  };
+}
+
+export function normalizeStationCatalogue(decision) {
+  const signals = decision?.environmentalSignals || {};
+  const forecast = decision?.forecast || {};
+  const stationName = firstText([
+    forecast.stationName,
+    array(forecast.forecasts).find((point) => point?.stationName)?.stationName,
+    signals.stationName,
+  ], "");
+  if (!stationName) return [];
+  return [{
+    id: forecast.stationKey || signals.stationKey || stationName,
+    name: stationName,
+    city: firstText([forecast.city, decision?.cityName, decision?.city?.cityName], "Selected city"),
+    provider: firstText([signals.provider, signals.aqiProvider, forecast.currentProvider], "AQI provider not reported"),
+    currentAqi: numberOrNull(decision?.currentAQI ?? signals.currentAqi ?? signals.aqi),
+    primaryPollutant: firstText([signals.dominantPollutant, signals.primaryPollutant], "Primary pollutant not reported"),
+    updatedAt: signals.observedAt || signals.timestamp || decision?.generatedAt,
+    freshness: enumLabel(signals.freshnessStatus || signals.dataFreshness || "CURRENT", "Freshness not reported"),
+    status: signals.aqiAvailable === false ? "Needs attention" : "Live",
+    latitude: forecast.stationLatitude ?? signals.stationLatitude ?? decision?.latitude,
+    longitude: forecast.stationLongitude ?? signals.stationLongitude ?? decision?.longitude,
+  }];
+}
+
+export function normalizeDecisionSnapshot(decision, city = null, timeline = null) {
+  const forecast = normalizeForecast(decision?.forecast);
+  const attribution = normalizeAttribution(decision?.attribution);
+  const enforcement = normalizeEnforcement(decision);
+  const areas = normalizeAreaIntelligence(decision);
+  const actions = normalizeActionQueue(decision);
+  const alerts = normalizeOperationalAlerts(decision);
+  const stations = normalizeStationCatalogue(decision);
+  const signals = decision?.environmentalSignals || {};
+  const lat = city?.latitude ?? city?.lat ?? decision?.latitude ?? signals.latitude;
+  const lng = city?.longitude ?? city?.lng ?? city?.lon ?? decision?.longitude ?? signals.longitude;
+  return {
+    city,
+    station: stations[0] || null,
+    coordinates: Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)) ? { latitude: Number(lat), longitude: Number(lng) } : null,
+    snapshotId: decision?.snapshotId,
+    currentAqi: numberOrNull(decision?.currentAQI ?? signals.currentAqi ?? signals.aqi),
+    currentStandard: signals.aqiStandard || decision?.currentStandard || forecast.standard,
+    currentProvider: signals.provider || signals.aqiProvider || decision?.forecast?.currentProvider,
+    pollutants: signals.pollutants || {},
+    forecasts: forecast.points,
+    forecastResult: decision?.forecast,
+    forecast,
+    attribution,
+    hotspots: areas.filter((area) => area.id !== "selected-area"),
+    areas,
+    alerts,
+    actions,
+    advisories: array(decision?.advisories?.advisories || decision?.advisories?.recommendations || decision?.advisories?.actions),
+    enforcement,
+    generatedAt: decision?.generatedAt,
+    timelineFrameCount: array(timeline?.frames).length,
   };
 }

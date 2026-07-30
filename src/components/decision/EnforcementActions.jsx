@@ -32,7 +32,7 @@ export default function EnforcementActions({ enforcement, priorityActions }) {
                 <p>{toDisplayText(item.reason, "No reason returned.")}</p>
                 <div className="decision-meta-grid">
                   <span>Agency</span>
-                  <strong>{item.agencyStatus === "NOT_REQUIRED" ? "No agency escalation required" : item.responsibleAgency || "Agency assignment pending"}</strong>
+                  <strong>{item.agencyStatus === "NOT_REQUIRED" ? "Air Quality Command Center" : item.responsibleAgency || "Agency assignment pending"}</strong>
                   <span>Target</span>
                   <strong>{toDisplayText(item.targetArea || item.wardId, "Citywide")}</strong>
                   <span>Urgency</span>

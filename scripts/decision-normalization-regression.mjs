@@ -6,11 +6,13 @@ import {
   normalizeActionQueue,
   normalizeAreaIntelligence,
   normalizeAttribution,
+  normalizeDecisionSnapshot,
   normalizeEnforcement,
   normalizeForecast,
   normalizeOperationalAlerts,
   normalizeOperationalHealth,
   normalizeRiskDecision,
+  normalizeStationCatalogue,
 } from "../src/services/decisionNormalization.js";
 
 const forecast = {
@@ -38,7 +40,15 @@ const decision = {
     optionalAiModelStatus: "DISABLED_FOR_CURRENT_DEPLOYMENT",
     failureReasons: {},
   },
-  environmentalSignals: { aqiAvailable: true },
+  environmentalSignals: {
+    aqiAvailable: true,
+    stationName: "Gomti Nagar, Lucknow",
+    provider: "CPCB_CAAQMS",
+    aqiStandard: "INDIA_NAQI",
+    currentAqi: 80,
+    dominantPollutant: "PM2.5",
+    observedAt: "2026-07-30T11:30:00Z",
+  },
   geospatial: {
     layers: [{
       layerType: "AQI_HOTSPOTS",
@@ -77,6 +87,9 @@ assert.equal(normalizedForecast.horizonCount, 3);
 assert.equal(normalizedForecast.engineLabel, "Atmospheric Forecast");
 assert.equal(normalizedForecast.provider, "OPEN_METEO");
 assert.equal(normalizedForecast.persistenceFallbackCount, 0);
+assert.equal(normalizedForecast.validPoints.every((point) => point.engine === "OPEN_METEO_PROVIDER_FORECAST"), true);
+assert.equal(normalizedForecast.validPoints.every((point) => point.provider === "OPEN_METEO"), true);
+assert.equal(normalizedForecast.validPoints.every((point) => point.aqiStandard === "US_AQI"), true);
 
 const mumbaiForecast = {
   engine: "PERSISTENCE_FALLBACK",
@@ -112,7 +125,7 @@ assert.equal(risk.peakForecastAqi, 78);
 const enforcement = normalizeEnforcement(decision);
 assert.equal(enforcement.priority, "Low");
 assert.equal(enforcement.confidenceText, "72%");
-assert.equal(enforcement.agencyStatus, "No agency escalation required");
+assert.equal(enforcement.agencyStatus, "Air Quality Command Center");
 assert.equal(enforcement.actionLabel, "No immediate enforcement required");
 assert.equal(enforcement.forecastAvailable, true);
 assert.equal(enforcement.reason.includes("forecast is unavailable"), false);
@@ -132,20 +145,56 @@ assert.equal(areas[1].area, "Central Market");
 
 const actions = normalizeActionQueue(decision);
 assert.equal(actions[0].title, "Continue monitoring");
-assert.equal(actions[0].agency, "No agency escalation required");
+assert.equal(actions[0].agency, "Air Quality Command Center");
 assert.equal(actions[0].status, "Suggested");
+assert.equal(/NO_ACTION_REQUIRED|NOT_REQUIRED/.test(JSON.stringify(actions)), false);
 
 const alerts = normalizeOperationalAlerts(decision);
 assert.ok(alerts.some((item) => item.type === "Current AQI"));
 assert.ok(alerts.some((item) => item.type === "Forecast"));
 assert.equal(alerts.some((item) => /fallback|chronos|model/i.test(`${item.title} ${item.reason} ${item.recommendedAction}`)), false);
+assert.equal(alerts.every((item) => ["Air Quality Command Center", "Pollution Control Board", "Traffic Police"].includes(item.agency)), true);
+assert.equal(alerts.every((item) => ["New", "Acknowledged", "Assigned", "In progress", "Resolved", "Expired"].includes(item.status)), true);
 
 const situation = buildSituationSummary(decision);
 assert.ok(situation.what.includes("AQI 80"));
 assert.equal(situation.where, "Industrial Estate");
 assert.ok(situation.forecast.includes("peak forecast AQI 78"));
 assert.equal(/OPEN_METEO|CHRONOS|PERSISTENCE|fallback/i.test(Object.values(situation).join(" ")), false);
-assert.equal(readFileSync(new URL("../src/pages/DecisionDashboard.jsx", import.meta.url), "utf8").includes("Collector and Model Status"), false);
+assert.ok(situation.why.includes("leading explained source"));
+assert.ok(situation.why.includes("Overall attribution confidence"));
+assert.ok(situation.why.includes("remains unexplained"));
+
+const snapshot = normalizeDecisionSnapshot(decision, { cityName: "Lucknow", latitude: 26.84, longitude: 80.94 }, { frames: [] });
+assert.deepEqual(snapshot.forecasts, normalizedForecast.points);
+assert.deepEqual(snapshot.forecasts, normalizeForecast(snapshot.forecastResult).points);
+assert.equal(snapshot.forecast.providerForecast, true);
+assert.equal(snapshot.currentAqi, 80);
+assert.equal(snapshot.coordinates.latitude, 26.84);
+assert.equal(snapshot.station?.name, "Gomti Nagar, Lucknow");
+
+const stations = normalizeStationCatalogue(decision);
+assert.equal(stations.length, 1);
+assert.equal(stations[0].name, "Gomti Nagar, Lucknow");
+assert.equal(JSON.stringify(stations).includes("Replay"), false);
+
+const dashboardSource = readFileSync(new URL("../src/pages/DecisionDashboard.jsx", import.meta.url), "utf8");
+const mapSource = readFileSync(new URL("../src/components/decision/GisDecisionMap.jsx", import.meta.url), "utf8");
+const enforcementActionsSource = readFileSync(new URL("../src/components/decision/EnforcementActions.jsx", import.meta.url), "utf8");
+assert.equal(dashboardSource.includes("Collector and Model Status"), false);
+assert.equal(dashboardSource.includes("Station forecast only"), false);
+assert.equal(dashboardSource.includes("Verified replay station"), false);
+assert.equal(dashboardSource.includes("Archive dependent"), false);
+assert.equal(dashboardSource.includes("Replay catalogue"), false);
+assert.equal(dashboardSource.includes("No agency escalation required"), false);
+assert.equal(dashboardSource.includes("No timeline frames returned"), false);
+assert.equal(dashboardSource.includes("required.Continue"), false);
+assert.equal(enforcementActionsSource.includes("No agency escalation required"), false);
+assert.ok(dashboardSource.includes("Historical forecast replay is not available because verified archived forecast and actual-observation pairs have not been connected."));
+assert.ok(dashboardSource.includes("const points = context.activeSnapshot?.forecasts || []"));
+assert.ok(mapSource.includes("decision-feature-panel"));
+assert.ok(mapSource.includes("System & Data Diagnostics"));
+assert.equal(mapSource.includes("Snapshot: {toDisplayText(snapshot?.snapshotId"), true);
 
 const labels = [
   enumLabel("NO_ACTION_REQUIRED"),
@@ -153,6 +202,7 @@ const labels = [
   enumLabel("OPEN_METEO_PROVIDER_FORECAST"),
   enumLabel("CHRONOS_DISABLED"),
   enumLabel("PARTIAL"),
+  enumLabel("NOT_REQUIRED"),
 ];
 assert.deepEqual(labels, [
   "No immediate enforcement required",
@@ -160,6 +210,7 @@ assert.deepEqual(labels, [
   "Atmospheric Forecast",
   "Optional AI model not used",
   "Limited evidence",
+  "Air Quality Command Center",
 ]);
 
 console.log("decision normalization regression passed");

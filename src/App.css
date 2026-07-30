@@ -7026,6 +7026,27 @@ body,
   overflow-wrap: anywhere;
 }
 
+.uqi-commandbar .uqi-icon-button {
+  width: auto;
+  min-width: 2.6rem;
+  padding-inline: 0.7rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+}
+
+.uqi-commandbar .uqi-menu-button,
+.uqi-commandbar .uqi-user-cluster .uqi-icon-button {
+  width: 2.5rem;
+  padding-inline: 0;
+}
+
+.uqi-commandbar .uqi-selector-icon {
+  width: auto;
+  min-width: 2.8rem;
+  padding-inline: 0.45rem;
+  font-size: 0.68rem;
+}
+
 :root[data-theme="dark"] .uqi-briefing-item,
 :root[data-theme="dark"] .uqi-area-row,
 :root[data-theme="dark"] .uqi-work-item,

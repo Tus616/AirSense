@@ -28,7 +28,7 @@ export default function TimelineSlider({ frames, selectedIndex, onChange, loadin
 
       {safeFrames.length === 0 ? (
         <div className="decision-empty-line">
-          {loading ? "Loading cached timeline frames." : "No timeline frames returned."}
+          {loading ? "Loading cached timeline frames." : "Historical replay is not configured for this station."}
         </div>
       ) : (
         <>

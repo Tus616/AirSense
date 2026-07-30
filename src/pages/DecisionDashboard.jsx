@@ -20,6 +20,7 @@ import { AnimatedNumber, MotionCard, MotionPage, motion, staggerContainer } from
 import { ErrorState, PanelSkeleton, RiskOverviewSkeleton } from "../components/decision/StatusViews";
 import {
   getDecisionIntelligence,
+  getGeoSpatialIntelligence,
   getHistoricalReplayStations,
   getTemporalTimeline,
   queryDecisionCopilot,
@@ -44,11 +45,13 @@ import {
   normalizeActionQueue,
   normalizeAreaIntelligence,
   normalizeAttribution,
+  normalizeDecisionSnapshot,
   normalizeEnforcement,
   normalizeForecast,
   normalizeOperationalAlerts,
   normalizeOperationalHealth,
   normalizeRiskDecision,
+  normalizeStationCatalogue,
 } from "../services/decisionNormalization";
 
 const NAV_ITEMS = [
@@ -72,12 +75,6 @@ const NAV_GROUPS = [
   ["Analytics", ["source-analysis", "historical-replay", "reports", "data-explorer"]],
   ["Enforcement", ["enforcement", "health-advisory"]],
   ["Management", ["settings"]],
-];
-
-const VERIFIED_REPLAY_STATIONS = [
-  "Gomti Nagar, Lucknow",
-  "ITO, Delhi",
-  "BKC, Mumbai",
 ];
 
 const CITY_PRESETS = [
@@ -238,11 +235,14 @@ function advisoryTitle(item, audience) {
   return toDisplayText(item?.title || item?.headline || item?.name, `${audience} advisory`);
 }
 
-function advisoryGuidance(item) {
-  return toDisplayText(
-    item?.guidance || item?.recommendation || item?.action || item?.message || item?.description,
-    "No public guidance text was returned for this advisory.",
-  );
+function operationalHealthGuidance(decision, item = {}) {
+  const risk = normalizeRiskDecision(decision);
+  const level = enumLabel(item?.severity || item?.riskLevel || risk.riskLevel || "MODERATE", "Moderate");
+  const area = normalizeAreaIntelligence(decision)[0]?.area || stationNameFromDecision(decision);
+  const duration = item?.duration || item?.horizon || (risk.trend === "Worsening" ? "next 24 to 72 hours" : "today");
+  const audience = advisoryAudienceKey(item);
+  const group = audience === "Asthma/COPD" ? "respiratory-risk groups" : audience.toLowerCase();
+  return `${level} precautions are recommended for ${group} in ${area} during prolonged outdoor activity ${duration}.`;
 }
 
 function actionDetailText(item) {
@@ -299,7 +299,7 @@ function commandTitle(activePage, city) {
 
 function commandSubtitle(activePage) {
   if (activePage === "overview") return "Municipal air-quality intelligence";
-  if (activePage === "historical-replay") return "Archive-backed forecast validation";
+  if (activePage === "historical-replay") return "Historical evaluation diagnostics";
   return "Operational air-quality intelligence";
 }
 
@@ -313,7 +313,12 @@ function useDecisionData(selectedCityMetadata) {
   const [error, setError] = useState("");
   const decisionRequestRef = useRef(null);
   const timelineRequestRef = useRef(null);
+  const geospatialRequestRef = useRef(null);
   const requestSeqRef = useRef(0);
+  const activeSnapshot = useMemo(
+    () => normalizeDecisionSnapshot(decision, selectedCityMetadata, timeline),
+    [decision, selectedCityMetadata, timeline],
+  );
 
   const fetchDecision = useCallback(async () => {
     const hasCoordinates = Number.isFinite(Number(selectedCityMetadata?.latitude))
@@ -321,6 +326,7 @@ function useDecisionData(selectedCityMetadata) {
     if (!hasCoordinates) {
       if (decisionRequestRef.current) decisionRequestRef.current.abort();
       if (timelineRequestRef.current) timelineRequestRef.current.abort();
+      if (geospatialRequestRef.current) geospatialRequestRef.current.abort();
       setDecision(null);
       setTimeline(null);
       setTimelineError("");
@@ -332,6 +338,7 @@ function useDecisionData(selectedCityMetadata) {
 
     if (decisionRequestRef.current) decisionRequestRef.current.abort();
     if (timelineRequestRef.current) timelineRequestRef.current.abort();
+    if (geospatialRequestRef.current) geospatialRequestRef.current.abort();
 
     const requestId = requestSeqRef.current + 1;
     requestSeqRef.current = requestId;
@@ -346,9 +353,23 @@ function useDecisionData(selectedCityMetadata) {
     setSelectedFrameIndex(1);
 
     try {
-      const data = await getDecisionIntelligence(selectedCityMetadata, { signal: controller.signal });
+      const geospatialController = new AbortController();
+      geospatialRequestRef.current = geospatialController;
+      const [decisionData, geospatialData] = await Promise.all([
+        getDecisionIntelligence(selectedCityMetadata, { signal: controller.signal }),
+        getGeoSpatialIntelligence(selectedCityMetadata, { signal: geospatialController.signal }).catch((geoErr) => {
+          if (geoErr?.name === "CanceledError" || geoErr?.code === "ERR_CANCELED") throw geoErr;
+          return null;
+        }),
+      ]);
       if (requestSeqRef.current !== requestId) return;
-      setDecision(data && typeof data === "object" ? data : null);
+      const mergedDecision = decisionData && typeof decisionData === "object"
+        ? { ...decisionData, geospatial: geospatialData && typeof geospatialData === "object" ? geospatialData : decisionData.geospatial }
+        : null;
+      setDecision(mergedDecision);
+      if (geospatialRequestRef.current === geospatialController) {
+        geospatialRequestRef.current = null;
+      }
       setLoading(false);
 
       const timelineController = new AbortController();
@@ -389,11 +410,13 @@ function useDecisionData(selectedCityMetadata) {
     return () => {
       if (decisionRequestRef.current) decisionRequestRef.current.abort();
       if (timelineRequestRef.current) timelineRequestRef.current.abort();
+      if (geospatialRequestRef.current) geospatialRequestRef.current.abort();
     };
   }, [fetchDecision]);
 
   return {
     decision,
+    activeSnapshot,
     timeline,
     timelineLoading,
     timelineError,
@@ -441,12 +464,17 @@ export default function DecisionDashboard() {
   const data = useDecisionData(selectedCityMetadata);
   const timelineFrames = asArray(data.timeline?.frames);
   const activeFrame = timelineFrames[data.selectedFrameIndex] || null;
-  const stationName = stationNameFromDecision(data.decision);
+  const stationName = data.activeSnapshot?.station?.name || stationNameFromDecision(data.decision);
   const generatedAt = formatDateTime(data.decision?.generatedAt, "Pending");
   const stationOptions = useMemo(() => {
-    const options = new Set([stationName, ...VERIFIED_REPLAY_STATIONS]);
+    const options = new Set(normalizeStationCatalogue(data.decision).map((station) => station.name));
+    if (stationName && stationName !== "Station unavailable") options.add(stationName);
     return Array.from(options).filter((item) => item && item !== "Station unavailable");
-  }, [stationName]);
+  }, [data.decision, stationName]);
+
+  useEffect(() => {
+    setSelectedStation("");
+  }, [selectedCityMetadata?.cityId, selectedCityMetadata?.placeId, selectedCityMetadata?.latitude, selectedCityMetadata?.longitude]);
 
   useEffect(() => {
     if (!selectedStation && stationName !== "Station unavailable") {
@@ -462,11 +490,13 @@ export default function DecisionDashboard() {
     ...data,
     city: selectedCityMetadata,
     selectedCity,
+    activeSnapshot: data.activeSnapshot,
     activeFrame,
     timelineFrames,
     mapsReady,
     mapsLoadError,
     selectedStation,
+    onStationChange: setSelectedStation,
     stationOptions,
     generatedAt,
   };
@@ -550,8 +580,9 @@ export default function DecisionDashboard() {
 }
 
 function DashboardSidebar({ activePage, open, collapsed, onClose, onToggleCollapse, decision, generatedAt }) {
-  const provider = decision?.forecast?.currentProvider || decision?.environmentalSignals?.provider || "Provider unavailable";
-  const standard = decision?.forecast?.forecastStandard || decision?.environmentalSignals?.aqiStandard || "AQI standard unavailable";
+  const snapshot = normalizeDecisionSnapshot(decision);
+  const provider = snapshot.currentProvider || "AQI provider pending";
+  const standard = snapshot.forecast?.standard || snapshot.currentStandard || "AQI standard pending";
   const itemLookup = useMemo(() => Object.fromEntries(NAV_ITEMS.map((item) => [item.id, item])), []);
 
   return (
@@ -634,10 +665,11 @@ function DashboardHeader({
 }) {
   const title = commandTitle(activePage, city);
   const subtitle = commandSubtitle(activePage);
-  const provider = decision?.forecast?.currentProvider || decision?.environmentalSignals?.provider || "CPCB";
-  const standard = decision?.forecast?.forecastStandard || decision?.environmentalSignals?.aqiStandard || "INDIA_NAQI";
-  const providerStatusLabel = provider === "Provider unavailable" ? "Provider pending" : `${labelize(provider)} live`;
-  const standardStatusLabel = standard === "AQI standard unavailable" ? "Standard pending" : `${labelize(standard)} live`;
+  const snapshot = normalizeDecisionSnapshot(decision, city);
+  const provider = snapshot.currentProvider || "AQI provider pending";
+  const standard = snapshot.forecast?.standard || snapshot.currentStandard || "AQI standard pending";
+  const providerStatusLabel = provider === "AQI provider pending" ? "Provider pending" : `${labelize(provider)} current AQI`;
+  const standardStatusLabel = standard === "AQI standard pending" ? "Standard pending" : `${labelize(standard)} forecast`;
   const isOverview = activePage === "overview";
 
   if (isOverview) {
@@ -647,19 +679,19 @@ function DashboardHeader({
           <div className="uqi-contextbar">
             <button className="uqi-icon-button uqi-menu-button" type="button" onClick={onMenu} aria-label="Open navigation">=</button>
             <div className="uqi-selector-card uqi-selector-card--city uqi-context-city">
-              <span className="uqi-selector-icon" aria-hidden="true">CY</span>
+              <span className="uqi-selector-icon" aria-hidden="true">City</span>
               <div>
                 <span className="uqi-selector-label">City</span>
                 <CitySelector city={city} loading={loading} onChange={onCityChange} />
               </div>
             </div>
             <label className="uqi-selector-card uqi-station-select uqi-context-station" title={selectedStation || "Station unavailable"}>
-              <span className="uqi-selector-icon" aria-hidden="true">ST</span>
+              <span className="uqi-selector-icon" aria-hidden="true">Station</span>
               <span className="uqi-selector-body">
                 <span className="uqi-selector-label">Monitoring station</span>
                 <select value={selectedStation} onChange={(event) => onStationChange(event.target.value)} disabled={stationOptions.length === 0}>
                   {stationOptions.length === 0 ? (
-                    <option value="">Unavailable</option>
+                    <option value="">No live station returned</option>
                   ) : (
                     stationOptions.map((station) => <option key={station} value={station}>{station}</option>)
                   )}
@@ -672,8 +704,8 @@ function DashboardHeader({
               <StatusBadge tone="low" label={standardStatusLabel} />
               <StatusBadge tone={mapsLoadError ? "medium" : "low"} label={mapsLoadError ? "Map degraded" : "Snapshot ready"} />
               <StatusBadge tone="neutral" label={generatedAt} />
-              <button className={`uqi-icon-button uqi-refresh-button ${loading ? "is-loading" : ""}`} type="button" onClick={onRefresh} disabled={loading} aria-label="Refresh dashboard">R</button>
-              <button className="uqi-icon-button" type="button" onClick={onSettings} aria-label="Open settings">S</button>
+              <button className={`uqi-icon-button uqi-refresh-button ${loading ? "is-loading" : ""}`} type="button" onClick={onRefresh} disabled={loading} aria-label="Refresh dashboard">Refresh</button>
+              <button className="uqi-icon-button" type="button" onClick={onSettings} aria-label="Open settings">Settings</button>
               <ThemeToggle theme={theme} onChange={onThemeChange} />
               <button className="uqi-logout-button" type="button" onClick={onLogout}>Logout</button>
             </div>
@@ -713,19 +745,19 @@ function DashboardHeader({
       <div className="uqi-commandbar__secondary">
         <div className="uqi-topbar__controls uqi-contextbar">
         <div className="uqi-selector-card uqi-selector-card--city">
-          <span className="uqi-selector-icon" aria-hidden="true">CY</span>
+          <span className="uqi-selector-icon" aria-hidden="true">City</span>
           <div>
             <span className="uqi-selector-label">City</span>
             <CitySelector city={city} loading={loading} onChange={onCityChange} />
           </div>
         </div>
         <label className="uqi-selector-card uqi-station-select" title={selectedStation || "Station unavailable"}>
-          <span className="uqi-selector-icon" aria-hidden="true">ST</span>
+          <span className="uqi-selector-icon" aria-hidden="true">Station</span>
           <span className="uqi-selector-body">
             <span className="uqi-selector-label">Monitoring station</span>
           <select value={selectedStation} onChange={(event) => onStationChange(event.target.value)} disabled={stationOptions.length === 0}>
             {stationOptions.length === 0 ? (
-              <option value="">Unavailable</option>
+              <option value="">No live station returned</option>
             ) : (
               stationOptions.map((station) => <option key={station} value={station}>{station}</option>)
             )}
@@ -738,8 +770,8 @@ function DashboardHeader({
             <StatusBadge tone="low" label={standardStatusLabel} />
             <StatusBadge tone={mapsLoadError ? "medium" : "low"} label={mapsLoadError ? "Map degraded" : "Snapshot ready"} />
             <StatusBadge tone="neutral" label={generatedAt} />
-            <button className={`uqi-icon-button uqi-refresh-button ${loading ? "is-loading" : ""}`} type="button" onClick={onRefresh} disabled={loading} aria-label="Refresh dashboard">R</button>
-          <button className="uqi-icon-button" type="button" onClick={onSettings} aria-label="Open settings">S</button>
+            <button className={`uqi-icon-button uqi-refresh-button ${loading ? "is-loading" : ""}`} type="button" onClick={onRefresh} disabled={loading} aria-label="Refresh dashboard">Refresh</button>
+          <button className="uqi-icon-button" type="button" onClick={onSettings} aria-label="Open settings">Settings</button>
           </div>
         </div>
       </div>
@@ -819,7 +851,7 @@ function SituationBriefingCard({ decision, activeFrame }) {
       <PanelHeader eyebrow="Municipal Briefing" title={summary.what} chip={activeFrame?.label || summary.status} />
       <div className="uqi-briefing-grid">
         <BriefingItem label="Where" value={summary.where} />
-        <BriefingItem label="Likely cause" value={summary.why} />
+        <BriefingItem label="Source evidence" value={summary.why} />
         <BriefingItem label="Forecast" value={summary.forecast} />
         <BriefingItem label="Who is affected" value={summary.affected} />
         <BriefingItem label="Action now" value={summary.action} />
@@ -871,9 +903,10 @@ function SnapshotTile({ label, value, detail, tone = "neutral" }) {
 
 function AreasAttentionCard({ decision, limit = 4 }) {
   const areas = normalizeAreaIntelligence(decision).slice(0, limit);
+  const onlySelectedArea = areas.length === 1 && areas[0]?.id === "selected-area";
   return (
     <MotionCard className="uqi-panel uqi-area-command-card">
-      <PanelHeader eyebrow="Area Intelligence" title="Areas needing attention" chip={`${areas.length} visible`} />
+      <PanelHeader eyebrow="Area Intelligence" title={onlySelectedArea ? "Selected station area" : "Areas requiring attention"} chip={`${areas.length} visible`} />
       <div className="uqi-area-table">
         {areas.map((area) => (
           <article className="uqi-area-row" key={area.id}>
@@ -979,7 +1012,7 @@ function HealthAdvisoryPreview({ decision }) {
         <span>{audience === "Asthma/COPD" ? "Respiratory-risk groups" : audience}</span>
         <span>{enumLabel(first.severity || advisory.riskLevel || "MODERATE", "Moderate precautions")}</span>
       </div>
-      <p className="uqi-note">{advisoryGuidance(first)}</p>
+      <p className="uqi-note">{operationalHealthGuidance(decision, first)}</p>
       <div className="uqi-audience-row">
         {["General public", "Children", "Elderly", "Respiratory-risk", "Pregnant people", "Outdoor workers"].map((label) => (
           <span key={label}>{label}</span>
@@ -991,8 +1024,8 @@ function HealthAdvisoryPreview({ decision }) {
 }
 
 function ForecastPage({ context }) {
-  const points = getForecastPoints(context.decision?.forecast);
-  const forecast = normalizeForecast(context.decision?.forecast);
+  const points = context.activeSnapshot?.forecasts || [];
+  const forecast = context.activeSnapshot?.forecast || normalizeForecast(context.decision?.forecast);
   const risk = normalizeRiskDecision(context.decision);
   const highest = forecast.validPoints.slice().sort((a, b) => asNumber(b.predictedAqi, -1) - asNumber(a.predictedAqi, -1))[0];
   return (
@@ -1008,7 +1041,7 @@ function ForecastPage({ context }) {
         <MetricCard label="Trend" value={risk.trend} tone={risk.trend === "Worsening" ? "medium" : "low"} />
         <MetricCard label="Highest horizon" value={highest?.key || "Unavailable"} tone="neutral" />
       </section>
-      <LiveForecastCard forecastResult={context.decision?.forecast} moduleStatus={statusFor(context.decision, "forecast")} />
+      <LiveForecastCard forecastResult={context.activeSnapshot?.forecastResult || context.decision?.forecast} moduleStatus={statusFor(context.decision, "forecast")} />
       <section className="uqi-panel uqi-diagnostics-shell">
         <details className="uqi-details">
           <summary>System & Data Diagnostics</summary>
@@ -1031,7 +1064,7 @@ function ForecastPage({ context }) {
                   <tr key={point.key}>
                     <td>{point.key}</td>
                     <td>{formatAqi(point.predictedAqi)}</td>
-                    <td>{engineLabel(point, context.decision?.forecast)}</td>
+                    <td>{engineLabel(point, context.activeSnapshot?.forecastResult || context.decision?.forecast)}</td>
                     <td>{toDisplayText(point.modelVersion || point.modelFamily, "Unavailable")}</td>
                     <td>{labelize(point.modelPromotionStatus || point.promotionStatus, "Unavailable")}</td>
                     <td>{fallbackReasonLabel(point.fallbackReason || asArray(point.insufficiencyReasons)[0])}</td>
@@ -1043,7 +1076,6 @@ function ForecastPage({ context }) {
           </div>
         </details>
       </section>
-      <HistoricalReplayCard expanded />
     </div>
   );
 }
@@ -1052,63 +1084,67 @@ function HistoricalReplayPage() {
   return (
     <div className="uqi-page-stack">
       <PageIntro
-        eyebrow="Historical Replay"
-        title="Archive-backed forecast validation"
-        note="Replay controls and results are isolated from the live dashboard context. Missing archive frames remain explicitly unavailable."
+        eyebrow="Historical Evaluation"
+        title="Replay diagnostics"
+        note="Historical evaluation is separated from live municipal operations."
       />
-      <HistoricalReplayCard expanded />
+      <HistoricalReplayUnavailableCard />
     </div>
   );
 }
 
+function HistoricalReplayUnavailableCard() {
+  return (
+    <section className="uqi-panel uqi-diagnostics-shell">
+      <PanelHeader eyebrow="Historical Replay" title="Replay not connected" chip="Diagnostics" />
+      <p className="uqi-note">Historical forecast replay is not available because verified archived forecast and actual-observation pairs have not been connected.</p>
+      <details className="uqi-details">
+        <summary>What is required</summary>
+        <p className="uqi-note">Replay will return when each supported station has paired issue-time forecasts and future actual observations in the archive. Empty tables are hidden until those records exist.</p>
+      </details>
+    </section>
+  );
+}
+
 function StationsPage({ context }) {
-  const forecast = context.decision?.forecast || {};
-  const points = getForecastPoints(forecast);
-  const selectedName = context.selectedStation || stationNameFromDecision(context.decision);
-  const rows = [
-    {
-      name: stationNameFromDecision(context.decision),
-      key: forecast.stationKey || points.find((point) => point.stationKey)?.stationKey || "Unavailable",
-      observations: points.reduce((max, point) => Math.max(max, asNumber(point.validObservationCount, 0)), 0),
-      provider: forecast.currentProvider || context.decision?.environmentalSignals?.provider,
-      status: "Selected",
-      kind: "selected",
-      updatedAt: context.decision?.environmentalSignals?.observedAt || context.decision?.generatedAt,
-    },
-    ...VERIFIED_REPLAY_STATIONS.map((name) => ({
-      name,
-      key: "Verified replay station",
-      observations: "Archive dependent",
-      provider: "Historical archive",
-      status: "Replay eligible when supported",
-      kind: "archive",
-      updatedAt: "Replay catalogue",
-    })),
-  ];
+  const rows = context.activeSnapshot?.stations || normalizeStationCatalogue(context.decision);
+  const selectedName = context.selectedStation || context.activeSnapshot?.station?.name || stationNameFromDecision(context.decision);
 
   return (
     <div className="uqi-page-stack">
       <PageIntro
         eyebrow="Stations"
-        title="Station-level operational view"
-        note="The dashboard keeps the selected station's current AQI, pollutants, weather, and history together. No cross-station artifact mapping is performed in the frontend."
+        title="Live station catalogue"
+        note="Only live station evidence from the active city snapshot is shown in the operational catalogue."
       />
       <section className="uqi-panel">
-        <PanelHeader eyebrow="Catalogue" title="Operational stations in view" chip={`${rows.length} visible`} />
+        <PanelHeader eyebrow="Catalogue" title="Operational stations in view" chip={`${rows.length} live`} />
         <div className="uqi-station-grid">
-          {rows.map((row) => (
-            <article className={`uqi-mini-card uqi-station-card is-${row.kind} ${row.name === selectedName ? "is-selected" : ""}`} key={`${row.name}-${row.key}`}>
+          {rows.length === 0 ? <EmptyLine text="No live station catalogue rows were returned for this city snapshot." /> : rows.map((row) => (
+            <article className={`uqi-mini-card uqi-station-card ${row.name === selectedName ? "is-selected" : ""}`} key={`${row.name}-${row.id}`}>
               <span className="uqi-card-kicker">{row.name === selectedName ? "Current live selection" : row.status}</span>
               <strong>{row.name}</strong>
               <dl className="uqi-definition-grid">
-                <div><dt>Station key</dt><dd>{toDisplayText(row.key)}</dd></div>
-                <div><dt>Observations</dt><dd>{toDisplayText(row.observations)}</dd></div>
+                <div><dt>City</dt><dd>{toDisplayText(row.city, "Selected city")}</dd></div>
                 <div><dt>Provider</dt><dd>{toDisplayText(row.provider)}</dd></div>
-                <div><dt>Last update</dt><dd>{row.kind === "selected" ? formatDateTime(row.updatedAt) : toDisplayText(row.updatedAt)}</dd></div>
+                <div><dt>Current AQI</dt><dd>{formatAqi(row.currentAqi)}</dd></div>
+                <div><dt>Primary pollutant</dt><dd>{toDisplayText(row.primaryPollutant)}</dd></div>
+                <div><dt>Last updated</dt><dd>{formatDateTime(row.updatedAt)}</dd></div>
+                <div><dt>Freshness</dt><dd>{row.freshness}</dd></div>
               </dl>
+              <div className="uqi-panel-actions">
+                <button className="uqi-button uqi-button--secondary" type="button" onClick={() => context.onStationChange?.(row.name)}>Select station</button>
+                <Link className="uqi-button" to="/gov/maps">View on map</Link>
+              </div>
             </article>
           ))}
         </div>
+      </section>
+      <section className="uqi-panel uqi-diagnostics-shell">
+        <details className="uqi-details">
+          <summary>Archive station diagnostics</summary>
+          <p className="uqi-note">Historical replay stations are separated from live operations until verified archived forecast and actual-observation pairs are connected.</p>
+        </details>
       </section>
     </div>
   );
@@ -1123,14 +1159,15 @@ function MapsPage({ context }) {
         note="Layer controls use existing geospatial outputs. Leaflet/OpenStreetMap rendering keeps degraded evidence visible without synthesizing geometry."
       />
       <section className="uqi-panel uqi-panel--map-page">
-        <GisDecisionMap city={context.city} snapshot={context.decision} mapsReady={context.mapsReady} />
+        <GisDecisionMap city={context.city} snapshot={context.decision} activeSnapshot={context.activeSnapshot} geoSpatialOverride={context.decision?.geospatial || context.decision?.geoSpatial || context.decision?.geoSpatialIntelligence || { layers: [] }} mapsReady={context.mapsReady} />
       </section>
     </div>
   );
 }
 
 function SourceAnalysisPage({ context }) {
-  const normalized = normalizeAttribution(context.decision?.attribution);
+  const normalized = context.activeSnapshot?.attribution || normalizeAttribution(context.decision?.attribution);
+  const unknown = normalized.sources.find((source) => String(source.sourceType || source.displayName || "").toUpperCase().includes("UNKNOWN"));
   return (
     <div className="uqi-page-stack">
       <PageIntro
@@ -1141,8 +1178,9 @@ function SourceAnalysisPage({ context }) {
       <section className="uqi-enforcement-grid">
         <MetricCard label="Leading explained source" value={normalized.leadingSource?.sourceLabel || "Unavailable"} tone="neutral" />
         <MetricCard label="Contribution" value={normalized.leadingSource?.contributionText || "Unavailable"} tone="medium" />
-        <MetricCard label="Confidence" value={normalized.leadingSource?.confidenceText || normalized.confidenceText} tone="low" />
-        <MetricCard label="Source rows" value={normalized.sources.length} tone="neutral" />
+        <MetricCard label="Source confidence" value={normalized.leadingSource?.confidenceText || "Unavailable"} tone="low" />
+        <MetricCard label="Overall confidence" value={normalized.confidenceText} tone="low" />
+        <MetricCard label="Unexplained" value={unknown?.contributionText || "Not reported"} tone="neutral" />
       </section>
       <SourceAttributionCard attribution={context.decision?.attribution} />
     </div>
@@ -1150,9 +1188,12 @@ function SourceAnalysisPage({ context }) {
 }
 
 function EnforcementPage({ context }) {
-  const enforcement = normalizeEnforcement(context.decision);
-  const actions = normalizeActionQueue(context.decision);
+  const enforcement = context.activeSnapshot?.enforcement || normalizeEnforcement(context.decision);
+  const actions = context.activeSnapshot?.actions || normalizeActionQueue(context.decision);
   const [workflow, setWorkflow] = useState({});
+  useEffect(() => {
+    setWorkflow({});
+  }, [context.activeSnapshot?.snapshotId]);
   const visibleActions = actions.map((item) => ({ ...item, status: workflow[item.id] || item.status }));
   const updateStatus = (id, status) => setWorkflow((current) => ({ ...current, [id]: status }));
 
@@ -1243,7 +1284,7 @@ function HealthAdvisoryPage({ context }) {
       </section>
       <section className="uqi-panel">
         <PanelHeader eyebrow="Guidance" title="Health advisories" chip={`${advisories.length} items`} />
-        <HealthAdvisoryGroups grouped={groupedAdvisories} empty="No health advisories were returned for this snapshot." />
+        <HealthAdvisoryGroups grouped={groupedAdvisories} decision={context.decision} empty="No health advisories were returned for this snapshot." />
       </section>
       <section className="uqi-panel">
         <PanelHeader eyebrow="Sensitive Groups" title="Groups needing extra caution" chip={`${groups.length} groups`} />
@@ -1256,18 +1297,24 @@ function HealthAdvisoryPage({ context }) {
 }
 
 function AlertsPage({ context }) {
-  const alerts = normalizeOperationalAlerts(context.decision);
+  const alerts = context.activeSnapshot?.alerts || normalizeOperationalAlerts(context.decision);
+  const [workflow, setWorkflow] = useState({});
+  useEffect(() => {
+    setWorkflow({});
+  }, [context.activeSnapshot?.snapshotId]);
   const [severity, setSeverity] = useState("all");
   const [agency, setAgency] = useState("all");
   const severities = ["all", ...new Set(alerts.map((item) => item.severity).filter(Boolean))];
   const agencies = ["all", ...new Set(alerts.map((item) => item.agency).filter(Boolean))];
-  const filteredAlerts = alerts.filter((item) => (severity === "all" || item.severity === severity) && (agency === "all" || item.agency === agency));
+  const visibleAlerts = alerts.map((item) => ({ ...item, status: workflow[item.id] || item.status }));
+  const filteredAlerts = visibleAlerts.filter((item) => (severity === "all" || item.severity === severity) && (agency === "all" || item.agency === agency));
+  const setAlertStatus = (id, status) => setWorkflow((current) => ({ ...current, [id]: status }));
   return (
     <div className="uqi-page-stack">
       <PageIntro
         eyebrow="Alerts"
         title="Operational watch desk"
-        note="Watch items are derived from current AQI, forecast, source evidence, area layers, and advisories. No notification is sent from this page."
+        note="Review, assign, and track air-quality watch items."
       />
       <section className="uqi-panel uqi-alert-workbench">
         <PanelHeader eyebrow="Filters" title="Watch items" chip={`${filteredAlerts.length} visible`} />
@@ -1287,11 +1334,21 @@ function AlertsPage({ context }) {
                   <span>{item.type}</span>
                   <span>{item.area}</span>
                   <span>{item.severity}</span>
+                  <span>Current AQI {formatAqi(item.currentAqi)}</span>
+                  <span>Forecast AQI {formatAqi(item.forecastAqi)}</span>
                   <span>{item.agency}</span>
                   <span>{item.status}</span>
                   <span>{item.confidenceText}</span>
+                  <span>{formatDateTime(item.createdAt || context.decision?.generatedAt)}</span>
                 </div>
                 <p>{item.recommendedAction}</p>
+                <div className="uqi-workflow-controls">
+                  <button type="button" onClick={() => setAlertStatus(item.id, "Acknowledged")}>Acknowledge</button>
+                  <button type="button" onClick={() => setAlertStatus(item.id, "Assigned")}>Assign</button>
+                  <Link className="uqi-button uqi-button--secondary" to="/gov/maps">Open map</Link>
+                  <button type="button" onClick={() => setAlertStatus(item.id, "In progress")}>Create action</button>
+                  <button type="button" onClick={() => setAlertStatus(item.id, "Resolved")}>Resolve</button>
+                </div>
               </article>
             ))}
           </div>
@@ -1686,33 +1743,16 @@ function HistoricalReplayCard({ expanded = false }) {
   const replayTimelineFrames = asArray(replay?.timelineFrames);
   const selectedFrame = replayTimelineFrames[replayFrameIndex] || replayTimelineFrames[0] || null;
   const hasReplayFrames = replayTimelineFrames.length > 0;
-  const fallbackStations = [
-    { stationKey: "lucknow_gomti_nagar", stationName: "Gomti Nagar, Lucknow" },
-    { stationKey: "delhi_ito", stationName: "ITO, Delhi" },
-    { stationKey: "mumbai_bandra_kurla_complex", stationName: "Bandra Kurla Complex, Mumbai" },
-  ];
-  const stationOptions = stations.length > 0 ? stations : fallbackStations;
+  const stationOptions = stations;
   const selectedStation = useMemo(
     () => stationOptions.find((item) => item.stationKey === stationKey) || stationOptions[0] || null,
     [stationOptions, stationKey],
   );
   const minReplayDate = dateInputValue(selectedStation?.earliestReplayTimestamp || selectedStation?.earliestValidReplayTimestamp);
   const maxReplayDate = dateInputValue(selectedStation?.latestReplayTimestamp || selectedStation?.latestValidReplayTimestamp);
-  const replayRows = (Array.isArray(replay?.results) && replay.results.length > 0
+  const replayRows = Array.isArray(replay?.results) && replay.results.length > 0
     ? replay.results
-    : Array.isArray(replay?.horizons) && replay.horizons.length > 0 ? replay.horizons : [24, 48, 72].map((hours) => ({
-    horizonHours: hours,
-    predictedAqi: null,
-    actualAqi: null,
-    absoluteError: null,
-    percentageError: null,
-    engine: null,
-    modelVersion: null,
-    promotionStatus: null,
-    featureCoverage: null,
-    fallbackReason: null,
-    actualObservationTimestamp: null,
-  })));
+    : Array.isArray(replay?.horizons) && replay.horizons.length > 0 ? replay.horizons : [];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1721,7 +1761,7 @@ function HistoricalReplayCard({ expanded = false }) {
       .then((result) => {
         const rows = Array.isArray(result) ? result : [];
         setStations(rows);
-        const firstKey = rows[0]?.stationKey || fallbackStations[0].stationKey;
+        const firstKey = rows[0]?.stationKey || "";
         setStationKey((current) => current || firstKey);
         const first = rows.find((item) => item.stationKey === firstKey) || rows[0];
         setDate((current) => current || dateInputValue(first?.earliestReplayTimestamp || first?.earliestValidReplayTimestamp));
@@ -1730,8 +1770,8 @@ function HistoricalReplayCard({ expanded = false }) {
       .catch((err) => {
         if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") return;
         setStations([]);
-        setStationKey((current) => current || fallbackStations[0].stationKey);
-        setValidation("Station replay catalogue is unavailable; verified archive station presets remain selectable.");
+        setStationKey("");
+        setValidation("Historical replay is not configured for this station.");
       });
     return () => controller.abort();
   }, []);
@@ -1908,12 +1948,17 @@ function SourceAttributionCard({ attribution, compact = false }) {
   const displayedSources = compact ? sources.slice(0, 2) : sources;
   const hiddenCount = Math.max(0, sources.length - displayedSources.length);
   const leading = normalized.leadingSource;
+  const unknown = sources.find((source) => String(source.sourceType || source.displayName || "").toUpperCase().includes("UNKNOWN"));
   return (
     <section className={`uqi-panel uqi-source-attribution-card ${compact ? "is-compact" : ""}`}>
       <PanelHeader eyebrow="Leading source" title={leading?.sourceLabel || "Evidence not available"} chip={leading?.contributionText || "Contribution unavailable"} />
-      <p className="uqi-note">Overall confidence: {normalized.confidenceText}. Total contribution shown: {normalized.totalContribution}%.</p>
-      <p className="uqi-note">{toDisplayText(attribution?.explanation, "Attribution explanation was not included in the decision response.")}</p>
-      <p className="uqi-disclaimer">Source contributions are model-based estimates from available evidence. Unknown and missing evidence are preserved instead of hidden.</p>
+      <p className="uqi-note">
+        {leading
+          ? `${leading.sourceLabel} is the largest explained local signal at ${leading.contributionText} contribution with ${leading.confidenceText} source-specific confidence. Overall attribution confidence is ${normalized.confidenceText}${unknown ? `, and ${unknown.contributionText} remains unexplained` : ""}.`
+          : "Source attribution evidence is not connected for this snapshot."}
+      </p>
+      <p className="uqi-note">{toDisplayText(attribution?.explanation, "Additional traffic, industrial activity, and emissions inventory data improve verification confidence.")}</p>
+      <p className="uqi-disclaimer">Evidence-based source estimate. Unknown and missing evidence are preserved instead of hidden.</p>
       <div className="uqi-source-bars">
         {sources.length === 0 ? (
           <EmptyLine text="Insufficient evidence. Source attribution is unavailable for this snapshot." />
@@ -1962,7 +2007,7 @@ function GeospatialOverviewCard({ context }) {
   return (
     <MotionCard className="uqi-panel uqi-panel--map uqi-map-command-card">
       <PanelHeader eyebrow="Geospatial View" title="Map layers" chip={context.mapsLoadError ? "Degraded" : "Ready"} />
-      <GisDecisionMap city={context.city} snapshot={context.decision} mapsReady={context.mapsReady} />
+      <GisDecisionMap city={context.city} snapshot={context.decision} activeSnapshot={context.activeSnapshot} geoSpatialOverride={context.decision?.geospatial || context.decision?.geoSpatial || context.decision?.geoSpatialIntelligence || { layers: [] }} mapsReady={context.mapsReady} />
     </MotionCard>
   );
 }
@@ -2000,7 +2045,7 @@ function ActionList({ items, empty, compact = false }) {
   );
 }
 
-function HealthAdvisoryGroups({ grouped, empty }) {
+function HealthAdvisoryGroups({ grouped, decision, empty }) {
   const entries = Object.entries(grouped || {});
   if (entries.length === 0) return <EmptyLine text={empty} />;
   return (
@@ -2016,7 +2061,7 @@ function HealthAdvisoryGroups({ grouped, empty }) {
           ) : (
             <div className="uqi-action-list">
               {items.map((item, index) => (
-                <HealthAdvisoryCard key={`${audience}-${index}`} item={item} audience={audience} />
+                <HealthAdvisoryCard key={`${audience}-${index}`} item={item} audience={audience} decision={decision} />
               ))}
             </div>
           )}
@@ -2026,7 +2071,7 @@ function HealthAdvisoryGroups({ grouped, empty }) {
   );
 }
 
-function HealthAdvisoryCard({ item, audience }) {
+function HealthAdvisoryCard({ item, audience, decision }) {
   const evidence = parseEvidence(item?.evidence || item?.technicalEvidence || item?.supportingEvidence);
   return (
     <article className="uqi-action-item uqi-advisory-card">
@@ -2034,7 +2079,7 @@ function HealthAdvisoryCard({ item, audience }) {
         <strong>{advisoryTitle(item, audience)}</strong>
         <StatusBadge tone={getAqiTone(item?.aqi || item?.riskScore)} label={labelize(item?.severity || item?.riskLevel || item?.category, "Risk advisory")} />
       </div>
-      <span>{advisoryGuidance(item)}</span>
+      <span>{operationalHealthGuidance(decision, item)}</span>
       <div className="uqi-tag-list">
         <span>{audience}</span>
         {item?.confidence != null && <span>{confidenceText(item.confidence)} confidence</span>}
@@ -2268,7 +2313,7 @@ function DecisionCopilotDrawer({ cityId = "", city, timelineFrame, degradedMode 
     <div className={`uqi-copilot-portal ${open ? "is-open" : ""}`}>
       <button className={`uqi-copilot-launcher ${open ? "is-open" : ""} ${compactLauncher ? "is-compact-launcher" : ""}`} type="button" onClick={() => setOpen(true)} aria-label="Open Decision Copilot">
         <strong>Decision Copilot</strong>
-        <span>{response ? copilotModeLabel(response) : degradedMode ? "Partial-aware answers" : "Grounded answers"}</span>
+        <span>{response ? copilotModeLabel(response) : "Open assistant"}</span>
       </button>
       {open && (
         <>
