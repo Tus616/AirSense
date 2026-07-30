@@ -1,8 +1,10 @@
 import { asArray, formatPercent, labelize, toDisplayText } from "./decisionUtils";
+import { enumLabel, normalizeAttribution } from "../../services/decisionNormalization";
 
 export default function AttributionPanel({ attribution, activeDominantSource }) {
   const sources = asArray(attribution?.sources);
-  const dominantSource = activeDominantSource || attribution?.dominantSource;
+  const normalized = normalizeAttribution(attribution);
+  const dominantSource = activeDominantSource || normalized.leadingSource?.sourceLabel || attribution?.dominantSource;
   const contributionValue = (source) => {
     const value = source?.estimatedContributionPercent ?? source?.percentage ?? source?.contributionPercent;
     return value == null ? null : Number(value);
@@ -23,11 +25,12 @@ export default function AttributionPanel({ attribution, activeDominantSource }) 
     <section className="decision-panel">
       <div className="decision-panel__header">
         <div>
-          <span className="decision-eyebrow">Source Attribution</span>
+          <span className="decision-eyebrow">Leading source</span>
           <h2>{labelize(dominantSource, "Dominant source unavailable")}</h2>
         </div>
-        <span className="decision-chip">{formatPercent(attribution?.overallConfidence)}</span>
+        <span className="decision-chip">{normalized.leadingSource?.contributionText || formatPercent(attribution?.overallConfidence)}</span>
       </div>
+      <p className="decision-panel__note">Overall confidence: {normalized.confidenceText}. Total contribution shown: {normalized.totalContribution}%.</p>
 
       <p className="decision-panel__note">
         {toDisplayText(attribution?.explanation, "Attribution explanation was not included in the decision response.")}
@@ -58,14 +61,14 @@ export default function AttributionPanel({ attribution, activeDominantSource }) 
                   <strong>{toDisplayText(source.displayName, labelize(source.sourceType))}</strong>
                   <span>{formatPercent(source.confidence)} confidence{source.confidenceLabel ? ` - ${labelize(source.confidenceLabel)}` : ""}</span>
                 </div>
-                <b>{percent == null || Number.isNaN(percent) ? "Unavailable" : `${Math.round(percent)}%`}</b>
+                <b>{percent == null || Number.isNaN(percent) ? "Evidence not available" : `${Math.round(percent)}%`}</b>
               </div>
               <div className="decision-source-bar">
                 <span style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }} />
               </div>
               <div className="decision-tag-row">
-                <span>{labelize(source.dataOrigin || "derived_estimate")}</span>
-                <span>{labelize(source.dataAvailability || "partial")}</span>
+                <span>{enumLabel(source.dataOrigin || "DERIVED_FROM_REAL_DATA")}</span>
+                <span>{enumLabel(source.dataAvailability || "PARTIAL")}</span>
                 {source.signalType && <span>{labelize(source.signalType)}</span>}
                 {source.geometrySource && <span>{labelize(source.geometrySource)}</span>}
                 <span>{asArray(source.supportingEvidence || source.evidence).length} evidence</span>

@@ -93,13 +93,13 @@ class DecisionCopilotServiceTest {
 
         CopilotResponse response = service.answer(request("What will happen next 24h?", "+24h"));
 
-        assertThat(response.getAnswer()).contains("atmospheric provider forecast");
+        assertThat(response.getAnswer()).contains("atmospheric forecast");
         assertThat(response.getCitations()).anyMatch(citation -> citation.getLabel().equals("Forecast engine")
-                && citation.getValue().equals("Atmospheric Provider Forecast"));
+                && citation.getValue().equals("Atmospheric Forecast"));
         assertThat(response.getGrounding()).containsEntry("sharedSnapshotId", "snap-test-DELHI");
         assertThat(response.getGrounding()).containsEntry("provider", "CPCB_CAAQMS");
         assertThat(response.getGrounding()).containsEntry("forecastStandard", "US_AQI");
-        assertThat(response.getGrounding()).containsEntry("forecastEngine", "Atmospheric Provider Forecast");
+        assertThat(response.getGrounding()).containsEntry("forecastEngine", "Atmospheric Forecast");
     }
 
     @Test
@@ -242,7 +242,7 @@ class DecisionCopilotServiceTest {
         assertThat(response.getAnswer())
                 .contains("Current condition")
                 .contains("Forecast direction")
-                .contains("Atmospheric Provider Forecast")
+                .contains("Atmospheric Forecast")
                 .contains("Strongest attribution evidence")
                 .contains("Priority action")
                 .contains("Health advice");

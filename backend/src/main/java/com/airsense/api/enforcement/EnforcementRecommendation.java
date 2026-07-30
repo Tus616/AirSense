@@ -23,7 +23,10 @@ public class EnforcementRecommendation {
     private int priorityScore;
     private String priorityLevel;
     private EnforcementActionType actionType;
+    private String title;
+    private String actionLabel;
     private String responsibleAgency;
+    private String agencyStatus;
     private String targetArea;
     @Builder.Default
     private Map<String, Object> location = new HashMap<>();
@@ -40,6 +43,7 @@ public class EnforcementRecommendation {
     private String urgency;
     private String actionWindow;
     private double confidence;
+    private Boolean forecastAvailable;
     @Builder.Default
     private List<String> limitations = new ArrayList<>();
     private String forecastEngine;

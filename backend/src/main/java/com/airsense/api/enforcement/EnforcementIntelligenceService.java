@@ -79,7 +79,7 @@ public class EnforcementIntelligenceService {
 
         Map<EnforcementActionType, Candidate> candidates = new LinkedHashMap<>();
         if (signals.currentAqi <= 100 && !forecastExceeds(signals, 100) && signals.dataAvailable) {
-            addNoAction(candidates, signals, "Current AQI remains below action thresholds; forecast is unavailable");
+            addNoAction(candidates, signals, monitoringReason(signals));
         } else {
             addSourceActions(candidates, signals);
             addRiskActions(candidates, signals);
@@ -216,11 +216,18 @@ public class EnforcementIntelligenceService {
     }
 
     private void addNoAction(Map<EnforcementActionType, Candidate> candidates, EnforcementSignals signals, String reason) {
-        add(candidates, candidate(EnforcementActionType.NO_ACTION_REQUIRED,
-                "Municipal Corporation",
-                "Continue monitoring; no immediate enforcement action required",
+        add(candidates, candidate(EnforcementActionType.MONITORING,
+                "",
+                "Continue routine monitoring",
                 5, reason)
                 .evidence("aqi", "currentAqi", "AQI remains within acceptable range for enforcement escalation", providerConfidence(signals, "aqi")));
+    }
+
+    private String monitoringReason(EnforcementSignals signals) {
+        if (signals.forecastPeakAqi != null && signals.forecastPeakAqi > 0) {
+            return "Current AQI remains below intervention thresholds, and the atmospheric forecast remains in the moderate range. Continue routine monitoring; no immediate enforcement action is required.";
+        }
+        return "Current AQI remains below intervention thresholds. Continue routine monitoring; no immediate enforcement action is required.";
     }
 
     private Candidate candidate(EnforcementActionType type, String agency, String action, int baseScore, String reason) {
@@ -261,23 +268,62 @@ public class EnforcementIntelligenceService {
                 .priorityScore(priority)
                 .priorityLevel(priorityLevel(priority))
                 .actionType(candidate.actionType)
+                .title(title(candidate))
+                .actionLabel(actionLabel(candidate.actionType))
                 .responsibleAgency(candidate.responsibleAgency)
+                .agencyStatus(candidate.actionType == EnforcementActionType.MONITORING ? "NOT_REQUIRED" : valueOrDefault(candidate.responsibleAgency, "").isBlank() ? "PENDING" : "ASSIGNED")
                 .targetArea(valueOrDefault(signals.wardId, signals.cityId))
                 .location(signals.location)
-                .reason(candidate.reason + ". " + candidate.action + ".")
-                .recommendedActions(List.of(candidate.action))
+                .reason(sentence(candidate.reason) + " " + sentence(candidate.action))
+                .recommendedActions(recommendedActions(candidate))
                 .evidence(candidate.evidence)
                 .supportingEvidence(candidate.evidence)
                 .datasetsUsed(datasets)
                 .expectedImpact(expectedImpact(candidate.actionType, priority, signals))
                 .urgency(urgency(priority, signals))
-                .actionWindow(actionWindow(priority, signals))
+                .actionWindow(candidate.actionType == EnforcementActionType.MONITORING ? "Next 24 hours" : actionWindow(priority, signals))
                 .confidence(round(confidence))
                 .limitations(limitations(signals, candidate))
                 .forecastEngine(signals.forecastEngine)
+                .forecastAvailable(signals.forecastPeakAqi != null && signals.forecastPeakAqi > 0)
                 .snapshotId(signals.snapshotId)
                 .generatedAt(Instant.now())
                 .build();
+    }
+
+    private String title(Candidate candidate) {
+        if (candidate.actionType == EnforcementActionType.MONITORING || candidate.actionType == EnforcementActionType.NO_ACTION_REQUIRED) {
+            return "Continue monitoring";
+        }
+        return actionLabel(candidate.actionType);
+    }
+
+    private String actionLabel(EnforcementActionType type) {
+        return switch (type) {
+            case MONITORING, NO_ACTION_REQUIRED -> "No immediate enforcement required";
+            case INDUSTRIAL_INSPECTION -> "Industrial inspection";
+            case CONSTRUCTION_DUST_CONTROL -> "Construction dust control";
+            case TRAFFIC_DIVERSION -> "Traffic routing review";
+            case ROAD_DUST_WATER_SPRINKLING -> "Road dust suppression";
+            case WASTE_BURNING_INSPECTION -> "Waste-burning inspection";
+            case SCHOOL_OUTDOOR_ACTIVITY_RESTRICTION -> "School outdoor activity precautions";
+            case HEALTH_DEPARTMENT_ALERT -> "Health department readiness";
+            case PUBLIC_ADVISORY -> "Public advisory";
+            case GREEN_BUFFER_ACTION -> "Green buffer action";
+        };
+    }
+
+    private List<String> recommendedActions(Candidate candidate) {
+        if (candidate.actionType == EnforcementActionType.MONITORING || candidate.actionType == EnforcementActionType.NO_ACTION_REQUIRED) {
+            return List.of("Continue routine monitoring", "Review the next forecast update");
+        }
+        return List.of(candidate.action);
+    }
+
+    private String sentence(String value) {
+        String text = valueOrDefault(value, "").trim();
+        if (text.isBlank()) return "";
+        return text.endsWith(".") || text.endsWith("!") || text.endsWith("?") ? text : text + ".";
     }
 
     private int priority(Candidate candidate, EnforcementSignals signals) {
@@ -318,20 +364,20 @@ public class EnforcementIntelligenceService {
             case TRAFFIC_DIVERSION -> 12;
             case ROAD_DUST_WATER_SPRINKLING -> 10;
             case WASTE_BURNING_INSPECTION -> 16;
-            case HEALTH_DEPARTMENT_ALERT, SCHOOL_OUTDOOR_ACTIVITY_RESTRICTION, PUBLIC_ADVISORY -> 0;
+            case HEALTH_DEPARTMENT_ALERT, SCHOOL_OUTDOOR_ACTIVITY_RESTRICTION, PUBLIC_ADVISORY, MONITORING -> 0;
             case GREEN_BUFFER_ACTION -> 6;
             case NO_ACTION_REQUIRED -> 0;
         };
         String exposure = switch (type) {
             case HEALTH_DEPARTMENT_ALERT, SCHOOL_OUTDOOR_ACTIVITY_RESTRICTION, PUBLIC_ADVISORY -> "Reduces exposure through behavior change and preparedness";
-            case NO_ACTION_REQUIRED -> "No immediate exposure reduction expected";
+            case MONITORING, NO_ACTION_REQUIRED -> "No immediate exposure reduction expected";
             default -> "Expected to reduce local emissions if implemented promptly";
         };
         return ExpectedImpact.builder()
                 .impactLevel(priority >= 75 ? "HIGH" : priority >= 50 ? "MEDIUM" : "LOW")
                 .estimatedAqiReduction(reduction)
                 .exposureReduction(exposure)
-                .timeframe(type == EnforcementActionType.GREEN_BUFFER_ACTION ? "2-8 weeks" : "6-24 hours")
+                .timeframe(type == EnforcementActionType.GREEN_BUFFER_ACTION ? "2-8 weeks" : type == EnforcementActionType.MONITORING ? "Next 24 hours" : "6-24 hours")
                 .rationale("Impact estimated from AQI severity, forecast trend, source confidence, and administrative action type")
                 .build();
     }
@@ -346,7 +392,7 @@ public class EnforcementIntelligenceService {
         double attributionConfidence = attributionConfidence(attribution, dominantSource);
         double forecastConfidence = forecastPeak != null ? forecast.getOverallConfidence() : 0.0;
         Map<String, Object> population = safeMap(context.getPopulation());
-        boolean dataAvailable = currentAqi > 0 || dominantSource != PollutionSourceType.UNKNOWN;
+        boolean dataAvailable = currentAqi > 0 || forecastPeak != null || dominantSource != PollutionSourceType.UNKNOWN;
 
         return EnforcementSignals.builder()
                 .city(valueOrDefault(context.getCity(), context.getCityId()))

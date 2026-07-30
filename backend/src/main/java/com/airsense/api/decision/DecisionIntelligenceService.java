@@ -250,9 +250,9 @@ public class DecisionIntelligenceService {
                                     PollutionSourceType source, List<PriorityAction> actions) {
         String risk = riskLevel(Math.max(currentAqi, forecastPeak != null ? forecastPeak : currentAqi));
         String currentLabel = displayCurrentAqi != null && displayCurrentAqi > 0 ? String.valueOf(displayCurrentAqi) : "unavailable";
-        boolean forecastUnavailable = forecast == null || "UNAVAILABLE".equalsIgnoreCase(valueOrDefault(forecast.getMode(), forecast.getModelVersion()));
+        boolean forecastUnavailable = !forecastAvailable(forecast);
         String next = forecastUnavailable
-                ? "Forecast is unavailable until a genuinely trained and evaluated model exists."
+                ? "Forecast is unavailable because no valid 24/48/72 AQI horizon was returned."
                 : "Forecast is " + valueOrDefault(forecast.getOverallTrend(), forecastPeak != null && forecastPeak > currentAqi ? "worsening" : forecastPeak != null && forecastPeak < currentAqi ? "improving" : "stable")
                         + " with peak AQI around " + (forecastPeak != null && forecastPeak > 0 ? forecastPeak : "unavailable") + ".";
         String officialAction = actions.stream()
@@ -290,14 +290,38 @@ public class DecisionIntelligenceService {
             case RESIDENTIAL_COMBUSTION -> "NEIGHBORHOOD_RISK";
             default -> "UNKNOWN";
         };
+        int peak = Math.max(currentAqi, forecastPeak != null ? forecastPeak : currentAqi);
+        String level = riskLevel(peak);
+        String trend = forecastPeak == null ? "UNAVAILABLE" : forecastPeak > currentAqi ? "WORSENING" : forecastPeak < currentAqi ? "STABLE_TO_IMPROVING" : "STABLE";
         return RiskAssessment.builder()
+                .riskLevel(level)
+                .currentAqi(currentAqi > 0 ? currentAqi : null)
+                .peakForecastAqi(forecastPeak)
+                .trend(trend)
+                .decisionSummary(decisionSummary(level, trend, forecastPeak))
+                .confidence(providerConfidence(context, "aqi", 0.65))
+                .dataOrigin(forecastPeak != null && forecastPeak > 0 ? "CURRENT_AQI_AND_PROVIDER_FORECAST" : "CURRENT_AQI")
+                .limitations(forecastPeak != null && forecastPeak > 0 ? List.of() : List.of("Forecast horizon AQI was unavailable; decision is based on current AQI only."))
+                .snapshotId(snapshotId(context, null))
                 .currentRisk(riskLevel(currentAqi))
                 .forecastRisk(forecastPeak != null ? riskLevel(forecastPeak) : "UNAVAILABLE")
                 .dominantSourceRisk(sourceRisk)
                 .populationExposureRisk(populationCount >= 1_000_000 || populationCount >= 10000 ? "HIGH" : populationCount > 0 ? "MODERATE" : "UNKNOWN")
                 .sensitiveZoneRisk(schools > 0 || hospitals > 0 ? "HIGH" : "UNKNOWN")
-                .overallRiskLevel(riskLevel(Math.max(currentAqi, forecastPeak != null ? forecastPeak : currentAqi)))
+                .overallRiskLevel(level)
                 .build();
+    }
+
+    private String decisionSummary(String riskLevel, String trend, Integer forecastPeak) {
+        if ("GOOD".equals(riskLevel) || "MODERATE".equals(riskLevel)) {
+            return forecastPeak != null && forecastPeak > 0
+                    ? "Continue monitoring; immediate enforcement is not required."
+                    : "Continue monitoring with current AQI evidence.";
+        }
+        if ("ELEVATED".equals(riskLevel)) {
+            return "Continue monitoring and prepare targeted response if AQI worsens.";
+        }
+        return "Coordinate health, public communication, and municipal response.";
     }
 
     private List<PriorityAction> priorityActions(EnforcementResult enforcement, HealthAdvisoryResult advisories, int currentAqi, Integer forecastPeak) {
@@ -393,17 +417,26 @@ public class DecisionIntelligenceService {
                                       EnforcementResult enforcement, HealthAdvisoryResult advisories,
                                       Map<String, String> failures) {
         String fusionStatus = failures.containsKey("fusion") ? "FAILED" : context.getProviderStatus() != null && !context.getProviderStatus().isEmpty() ? "SUCCESS" : "PARTIAL";
+        boolean forecastAvailable = forecastAvailable(forecast);
+        int forecastHorizonCount = forecastHorizonCount(forecast);
+        int promotedHorizons = promotedHorizonCount(forecast);
+        int fallbackHorizons = persistenceFallbackHorizonCount(forecast);
         String forecastMode = forecast.getMode() != null ? forecast.getMode() : forecast.getModelVersion();
         String forecastStatus = failures.containsKey("forecast") ? "FAILED"
-                : "UNAVAILABLE".equalsIgnoreCase(forecastMode) ? "UNAVAILABLE"
+                : !forecastAvailable || "UNAVAILABLE".equalsIgnoreCase(forecastMode) ? "UNAVAILABLE"
                 : forecast.isFallbackUsed() ? "DEGRADED" : "SUCCESS";
-        boolean degraded = !failures.isEmpty() || "DEGRADED".equals(forecastStatus)
-                || attribution.getOverallConfidence() < 0.35
-                || forecast.getOverallConfidence() < 0.25;
+        boolean degraded = !failures.isEmpty() || "FAILED".equals(forecastStatus)
+                || ("UNAVAILABLE".equals(forecastStatus) && currentAqi(context) <= 0)
+                || "DEGRADED".equals(forecastStatus);
         return EngineStatus.builder()
                 .fusionStatus(fusionStatus)
                 .attributionStatus(failures.containsKey("attribution") ? "FAILED" : attribution.getOverallConfidence() < 0.35 ? "LOW_CONFIDENCE" : "SUCCESS")
                 .forecastStatus(forecastStatus)
+                .providerForecastStatus(forecastAvailable && hasProviderForecast(forecast) ? "ONLINE" : forecastAvailable ? "AVAILABLE" : "UNAVAILABLE")
+                .forecastHorizonCount(forecastHorizonCount)
+                .locallyPromotedModelHorizonCount(promotedHorizons)
+                .persistenceFallbackHorizonCount(fallbackHorizons)
+                .optionalAiModelStatus(hasProviderForecast(forecast) ? "DISABLED_FOR_CURRENT_DEPLOYMENT" : "NOT_USED")
                 .enforcementStatus(failures.containsKey("enforcement") ? "FAILED" : enforcement.getRecommendations() != null && !enforcement.getRecommendations().isEmpty() ? "SUCCESS" : "PARTIAL")
                 .advisoryStatus(failures.containsKey("advisory") ? "FAILED" : advisories.getAdvisories() != null && !advisories.getAdvisories().isEmpty() ? "SUCCESS" : "PARTIAL")
                 .degradedMode(degraded)
@@ -719,6 +752,46 @@ public class DecisionIntelligenceService {
                 : null;
     }
 
+    private boolean forecastAvailable(ForecastResult forecast) {
+        return forecast != null && forecast.getForecast() != null
+                && forecast.getForecast().values().stream()
+                .anyMatch(point -> point != null && point.getPredictedAqi() != null && point.getPredictedAqi() > 0);
+    }
+
+    private int forecastHorizonCount(ForecastResult forecast) {
+        return forecast != null && forecast.getForecast() != null
+                ? (int) forecast.getForecast().values().stream()
+                .filter(point -> point != null && point.getPredictedAqi() != null && point.getPredictedAqi() > 0)
+                .count()
+                : 0;
+    }
+
+    private boolean hasProviderForecast(ForecastResult forecast) {
+        if (forecast == null) return false;
+        String mode = valueOrDefault(forecast.getEngine(), valueOrDefault(forecast.getMode(), ""));
+        if ("OPEN_METEO_PROVIDER_FORECAST".equalsIgnoreCase(mode)) return true;
+        return forecast.getForecast() != null && forecast.getForecast().values().stream()
+                .anyMatch(point -> "OPEN_METEO_PROVIDER_FORECAST".equalsIgnoreCase(valueOrDefault(point.getEngine(), point.getMode())));
+    }
+
+    private int promotedHorizonCount(ForecastResult forecast) {
+        return forecast != null && forecast.getForecast() != null
+                ? (int) forecast.getForecast().values().stream()
+                .filter(point -> point != null && ("PROMOTED".equalsIgnoreCase(point.getModelPromotionStatus()) || "PROMOTED".equalsIgnoreCase(point.getPromotionStatus())))
+                .count()
+                : 0;
+    }
+
+    private int persistenceFallbackHorizonCount(ForecastResult forecast) {
+        return forecast != null && forecast.getForecast() != null
+                ? (int) forecast.getForecast().values().stream()
+                .filter(point -> point != null && ("PERSISTENCE".equalsIgnoreCase(valueOrDefault(point.getEngine(), point.getMode()))
+                        || "PERSISTENCE_FALLBACK".equalsIgnoreCase(valueOrDefault(point.getEngine(), point.getMode()))
+                        || point.isFallbackUsed()))
+                .count()
+                : 0;
+    }
+
     private PollutionSourceType source(AttributionResult attribution, EnforcementResult enforcement, HealthAdvisoryResult advisories) {
         if (attribution.getDominantSource() != null) return attribution.getDominantSource();
         if (enforcement.getDominantSource() != null) return parseSource(enforcement.getDominantSource());
@@ -736,7 +809,7 @@ public class DecisionIntelligenceService {
 
     private String riskLevel(int aqi) {
         if (aqi <= 50) return "GOOD";
-        if (aqi <= 100) return "NORMAL";
+        if (aqi <= 100) return "MODERATE";
         if (aqi <= 200) return "ELEVATED";
         if (aqi <= 300) return "HIGH";
         if (aqi <= 400) return "SEVERE";

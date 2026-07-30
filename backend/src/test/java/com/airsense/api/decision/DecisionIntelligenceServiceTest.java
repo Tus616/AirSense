@@ -149,7 +149,7 @@ class DecisionIntelligenceServiceTest {
     }
 
     @Test
-    void attributionLowConfidenceMarksDegradedMode() {
+    void attributionLowConfidenceDoesNotDegradeOperationalHealthWhenCoreEvidenceExists() {
         DecisionIntelligenceResult result = assemble(
                 context("KOCHI", 132),
                 attribution("KOCHI", PollutionSourceType.UNKNOWN, 0.20),
@@ -158,8 +158,60 @@ class DecisionIntelligenceServiceTest {
                 advisory("KOCHI", 132, 145, PollutionSourceType.UNKNOWN, AdvisorySeverity.MODERATE, 0.55)
         );
 
-        assertThat(result.getEngineStatus().isDegradedMode()).isTrue();
+        assertThat(result.getEngineStatus().isDegradedMode()).isFalse();
         assertThat(result.getEngineStatus().getAttributionStatus()).isEqualTo("LOW_CONFIDENCE");
+    }
+
+    @Test
+    void screenshotStateProviderForecastIsOperationalAndActionable() {
+        ForecastResult forecast = providerForecast("LUCKNOW", List.of(60, 68, 78), 0.72);
+        AttributionResult attribution = screenshotAttribution("LUCKNOW");
+        EnforcementResult enforcement = new EnforcementIntelligenceService(null, null, null)
+                .recommend(screenshotContext("LUCKNOW", 80), attribution, forecast, EnforcementRequest.builder()
+                        .cityId("LUCKNOW")
+                        .wardId("WARD-1")
+                        .build());
+
+        DecisionIntelligenceResult result = assemble(
+                screenshotContext("LUCKNOW", 80),
+                attribution,
+                forecast,
+                enforcement,
+                advisory("LUCKNOW", 80, 78, PollutionSourceType.TRAFFIC, AdvisorySeverity.MODERATE, 0.70)
+        );
+
+        assertThat(result.getModuleStatuses().get("forecast").getStatus()).isEqualTo("AVAILABLE");
+        assertThat(result.getEngineStatus().isDegradedMode()).isFalse();
+        assertThat(result.getEngineStatus().getForecastStatus()).isEqualTo("SUCCESS");
+        assertThat(result.getEngineStatus().getProviderForecastStatus()).isEqualTo("ONLINE");
+        assertThat(result.getEngineStatus().getForecastHorizonCount()).isEqualTo(3);
+        assertThat(result.getEngineStatus().getPersistenceFallbackHorizonCount()).isZero();
+        assertThat(result.getRiskAssessment().getRiskLevel()).isEqualTo("MODERATE");
+        assertThat(result.getRiskAssessment().getOverallRiskLevel()).isEqualTo("MODERATE");
+        assertThat(result.getRiskAssessment().getPeakForecastAqi()).isEqualTo(78);
+        assertThat(result.getRiskAssessment().getDecisionSummary()).contains("Continue monitoring");
+        assertThat(result.getSummary().getWhatWillHappenNext()).doesNotContain("Forecast is unavailable");
+
+        EnforcementRecommendation recommendation = result.getEnforcement().getRecommendations().get(0);
+        assertThat(recommendation.getActionType()).isEqualTo(EnforcementActionType.MONITORING);
+        assertThat(recommendation.getPriorityLevel()).isEqualTo("LOW");
+        assertThat(recommendation.getTitle()).isEqualTo("Continue monitoring");
+        assertThat(recommendation.getActionLabel()).isEqualTo("No immediate enforcement required");
+        assertThat(recommendation.getAgencyStatus()).isEqualTo("NOT_REQUIRED");
+        assertThat(recommendation.getResponsibleAgency()).isBlank();
+        assertThat(recommendation.getForecastAvailable()).isTrue();
+        assertThat(recommendation.getConfidence()).isEqualTo(0.72);
+        assertThat(recommendation.getReason())
+                .contains("atmospheric forecast remains in the moderate range")
+                .doesNotContain("forecast is unavailable")
+                .doesNotContain("required.Forecast");
+        assertThat(recommendation.getRecommendedActions())
+                .containsExactly("Continue routine monitoring", "Review the next forecast update");
+
+        int totalContribution = result.getAttribution().getSources().stream()
+                .mapToInt(PollutionSourceContribution::getContributionPercent)
+                .sum();
+        assertThat(totalContribution).isEqualTo(100);
     }
 
     @Test
@@ -188,7 +240,7 @@ class DecisionIntelligenceServiceTest {
                 advisory("MYSURU", 62, 82, PollutionSourceType.UNKNOWN, AdvisorySeverity.LOW, 0.74)
         );
 
-        assertThat(result.getRiskAssessment().getOverallRiskLevel()).isEqualTo("NORMAL");
+        assertThat(result.getRiskAssessment().getOverallRiskLevel()).isEqualTo("MODERATE");
         assertThat(result.getPriorityActions())
                 .extracting(PriorityAction::getActionType)
                 .doesNotContain("URGENT_ALERT");
@@ -302,6 +354,102 @@ class DecisionIntelligenceServiceTest {
                         .trend(trend)
                         .confidence(confidence)
                         .build()))
+                .build();
+    }
+
+    private CityEnvironmentalContext screenshotContext(String cityId, int currentAqi) {
+        return CityEnvironmentalContext.builder()
+                .city(cityId)
+                .cityId(cityId)
+                .timestamp(Instant.now())
+                .aqi(Map.of(
+                        "available", true,
+                        "currentAqi", currentAqi,
+                        "pollutants", Map.of("aqi", currentAqi),
+                        "selected", Map.of("currentAqi", currentAqi, "standard", "US_AQI", "provider", "CPCB_CAAQMS")
+                ))
+                .providerStatus(Map.of("aqi", "SUCCESS", "weather", "SUCCESS", "traffic", "SUCCESS"))
+                .providerConfidence(Map.of("aqi", 0.92, "weather", 0.88, "traffic", 0.76))
+                .metadata(Map.of("snapshotId", "snap-test-" + cityId))
+                .build();
+    }
+
+    private ForecastResult providerForecast(String cityId, List<Integer> values, double confidence) {
+        return ForecastResult.builder()
+                .city(cityId)
+                .cityId(cityId)
+                .wardId("WARD-1")
+                .generatedAt(Instant.now())
+                .snapshotId("snap-test-" + cityId)
+                .locationHash("loc-test-" + cityId)
+                .overallConfidence(confidence)
+                .overallTrend("stable to improving")
+                .fallbackUsed(false)
+                .engine("OPEN_METEO_PROVIDER_FORECAST")
+                .mode("OPEN_METEO_PROVIDER_FORECAST")
+                .forecastStandard("US_AQI")
+                .currentProvider("OPEN_METEO")
+                .forecast(Map.of(
+                        "24h", providerPoint(24, values.get(0), confidence),
+                        "48h", providerPoint(48, values.get(1), confidence),
+                        "72h", providerPoint(72, values.get(2), confidence)
+                ))
+                .build();
+    }
+
+    private ForecastPoint providerPoint(int horizon, int aqi, double confidence) {
+        return ForecastPoint.builder()
+                .horizonHours(horizon)
+                .predictedAqi(aqi)
+                .trend("stable")
+                .confidence(confidence)
+                .engine("OPEN_METEO_PROVIDER_FORECAST")
+                .mode("OPEN_METEO_PROVIDER_FORECAST")
+                .fallbackReason("CHRONOS_DISABLED")
+                .fallbackUsed(false)
+                .aqiStandard("US_AQI")
+                .provider("OPEN_METEO")
+                .modelPromotionStatus("NOT_APPLICABLE")
+                .build();
+    }
+
+    private AttributionResult screenshotAttribution(String cityId) {
+        return AttributionResult.builder()
+                .city(cityId)
+                .cityId(cityId)
+                .wardId("WARD-1")
+                .timestamp(Instant.now())
+                .snapshotId("snap-test-" + cityId)
+                .locationHash("loc-test-" + cityId)
+                .dominantSource(PollutionSourceType.TRAFFIC)
+                .overallConfidence(0.28)
+                .explanation("Traffic is one possible contributing source, but source evidence is limited.")
+                .sources(List.of(
+                        PollutionSourceContribution.builder()
+                                .sourceType(PollutionSourceType.UNKNOWN)
+                                .displayName("Unknown")
+                                .contributionPercent(50)
+                                .confidence(0.20)
+                                .dataOrigin("DERIVED_FROM_REAL_DATA")
+                                .dataAvailability("PARTIAL")
+                                .build(),
+                        PollutionSourceContribution.builder()
+                                .sourceType(PollutionSourceType.SECONDARY_AEROSOL_OR_OTHER)
+                                .displayName("Secondary aerosols / other")
+                                .contributionPercent(34)
+                                .confidence(0.24)
+                                .dataOrigin("DERIVED_FROM_REAL_DATA")
+                                .dataAvailability("PARTIAL")
+                                .build(),
+                        PollutionSourceContribution.builder()
+                                .sourceType(PollutionSourceType.TRAFFIC)
+                                .displayName("Traffic")
+                                .contributionPercent(16)
+                                .confidence(0.26)
+                                .dataOrigin("DERIVED_FROM_REAL_DATA")
+                                .dataAvailability("PARTIAL")
+                                .build()
+                ))
                 .build();
     }
 

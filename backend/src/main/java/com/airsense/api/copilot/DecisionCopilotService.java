@@ -839,7 +839,7 @@ public class DecisionCopilotService {
 
     private String forecastLabel(String engine) {
         String normalized = engine != null ? engine.toUpperCase(Locale.ROOT) : "";
-        if (normalized.contains("OPEN_METEO_PROVIDER_FORECAST")) return "Atmospheric Provider Forecast";
+        if (normalized.contains("OPEN_METEO_PROVIDER_FORECAST")) return "Atmospheric Forecast";
         if (normalized.contains("CHRONOS_BOLT_ZERO_SHOT")) return "Pretrained AI Forecast";
         if (normalized.contains("PERSISTENCE_FALLBACK")) return "Persistence Forecast Fallback";
         if (normalized.contains("UNAVAILABLE")) return "Forecast Unavailable";

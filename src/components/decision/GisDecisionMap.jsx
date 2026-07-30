@@ -18,6 +18,7 @@ import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { getGeoSpatialIntelligence } from "../../services/decisionApi";
 import { asArray, centerFromCity, GIS_LAYERS, labelize, toDisplayText } from "./decisionUtils";
+import { enumLabel } from "../../services/decisionNormalization";
 
 const DEFAULT_LAYERS = GIS_LAYERS.reduce((acc, layer) => ({ ...acc, [layer.id]: true }), {});
 const OSM_TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -102,6 +103,12 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
     () => asArray(geoSpatial?.layers).filter((layer) => visibleLayerTypes.has(layer.layerType || layer.layerId)),
     [geoSpatial, visibleLayerTypes]
   );
+  const hotspotFeatureCount = useMemo(
+    () => backendLayers
+      .filter((layer) => String(layer.layerType || layer.layerId) === "AQI_HOTSPOTS")
+      .reduce((count, layer) => count + featureCollection(layer).features.length, 0),
+    [backendLayers],
+  );
 
   const center = useMemo(() => {
     const backendCenter = geoSpatial?.metadata?.center;
@@ -113,7 +120,7 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
   }, [geoSpatial, city]);
 
   const snapshotSignals = snapshot?.environmentalSignals || {};
-  const snapshotStatus = snapshotSignals.aqiAvailable ? "LIVE" : "UNAVAILABLE";
+  const snapshotStatus = snapshotSignals.aqiAvailable ? "Live evidence" : "Evidence not available";
 
   const toggleLayer = (layerId) => {
     setLayers((current) => ({ ...current, [layerId]: !current[layerId] }));
@@ -164,8 +171,8 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
         Snapshot: {toDisplayText(snapshot?.snapshotId, "unavailable")}
         {" | "}Location: {toDisplayText(snapshot?.locationHash, "unavailable")}
         {" | "}AQI source: {toDisplayText(snapshotSignals.stationName, "source unavailable")}
-        {" | "}Observed: {toDisplayText(snapshotSignals.observedAt, "unavailable")}
-        {" | "}Fetched: {toDisplayText(snapshot?.generatedAt, "unavailable")}
+          {" | "}Observed: {toDisplayText(snapshotSignals.observedAt, "unavailable")}
+          {" | "}Fetched: {toDisplayText(snapshot?.generatedAt, "unavailable")}
         {" | "}Status: {snapshotStatus}
       </p>
 
@@ -228,6 +235,11 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
                 </button>
               </div>
             )}
+            {hotspotFeatureCount === 0 && (
+              <div className="decision-map-tile-overlay decision-map-tile-overlay--notice" role="status">
+                <span>No elevated hotspot zone was identified from the available evidence.</span>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -235,7 +247,7 @@ export default function GisDecisionMap({ city, geoSpatialOverride, snapshot }) {
         <p className="decision-panel__note" style={{ fontSize: "0.75rem", opacity: 0.7 }}>
           Tiles: OpenStreetMap
           {" | "}Geometry: {toDisplayText(geoSpatial.geometrySource, "unavailable")}
-          {geoSpatial.degradedMode ? " | Degraded mode: some layers may use fallback data" : ""}
+          {geoSpatial.degradedMode ? " | Layer note: some optional layer geometries are limited" : ""}
           {" | "}Layers: {asArray(geoSpatial.layers).length}
           {" | "}Confidence: {toDisplayText(geoSpatial.summary?.confidence, "unavailable")}
         </p>
@@ -293,9 +305,11 @@ function MapSync({ center }) {
 }
 
 function featureCollection(layer) {
+  const directFeatures = asArray(layer?.features);
+  const geoJsonFeatures = asArray(layer?.geoJson?.features);
   return {
     type: "FeatureCollection",
-    features: asArray(layer?.geoJson?.features),
+    features: geoJsonFeatures.length > 0 ? geoJsonFeatures : directFeatures,
   };
 }
 
@@ -364,7 +378,8 @@ function featurePopupHtml(layer, props) {
     ["Evidence", toDisplayText(props.dominantEvidence || props.datasetsUsed, "")],
     ["Confidence", props.confidence != null ? `${Math.round(Number(props.confidence) * 100)}%` : ""],
     ["Action", props.recommendedAction || props.recommendation],
-    ["Origin", props.dataOrigin || layer?.metadata?.dataOrigin],
+    ["Origin", enumLabel(props.dataOrigin || layer?.metadata?.dataOrigin, "Evidence not available")],
+    ["Snapshot", props.snapshotId],
   ].filter(([, value]) => value !== null && value !== undefined && value !== "");
   return `
     <div class="decision-map-popup">

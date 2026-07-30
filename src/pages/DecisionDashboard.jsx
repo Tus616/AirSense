@@ -38,6 +38,14 @@ import {
   moduleStatusReason,
   toDisplayText,
 } from "../components/decision/decisionUtils";
+import {
+  enumLabel,
+  normalizeAttribution,
+  normalizeEnforcement,
+  normalizeForecast,
+  normalizeOperationalHealth,
+  normalizeRiskDecision,
+} from "../services/decisionNormalization";
 
 const NAV_ITEMS = [
   { id: "overview", label: "Command Center", path: "/gov", code: "OV" },
@@ -152,7 +160,7 @@ function fallbackReasonLabel(reason) {
     EXTREME_FORECAST_CHANGE: "Extreme forecast change",
     OUT_OF_DISTRIBUTION_FEATURES: "Out-of-distribution features",
     LOW_GENERALIZATION_CONFIDENCE: "Low generalization confidence",
-    CHRONOS_DISABLED: "Pretrained model disabled",
+    CHRONOS_DISABLED: "Optional AI model not used",
     CHRONOS_UNAVAILABLE: "Pretrained model unavailable",
     INSUFFICIENT_HISTORY_FOR_CHRONOS: "Insufficient history for pretrained model",
     PROVIDER_FORECAST_UNAVAILABLE: "Provider forecast unavailable",
@@ -161,9 +169,7 @@ function fallbackReasonLabel(reason) {
   return String(reason || "")
     .split(";")
     .filter(Boolean)
-    .map((part) => part === "CHRONOS_DISABLED"
-      ? "Chronos skipped; provider forecast used"
-      : labels[part] || labelize(part, "No fallback reason reported"))
+    .map((part) => labels[part] || enumLabel(part, "No fallback reason reported"))
     .join(" / ");
 }
 
@@ -237,7 +243,10 @@ function advisoryGuidance(item) {
 
 function actionDetailText(item) {
   const detail = item?.description || item?.reason || item?.status || item?.message;
-  if (detail) return toDisplayText(detail);
+  if (detail) {
+    const text = toDisplayText(detail);
+    return /^[A-Z0-9_]+$/.test(text) ? enumLabel(text, text) : text;
+  }
   if (asArray(item?.recommendedActions).length > 0) {
     return asArray(item.recommendedActions).map((action) => toDisplayText(action)).join("; ");
   }
@@ -250,7 +259,7 @@ function actionDetailText(item) {
 function engineLabel(point, forecastResult) {
   const mode = point?.engine || point?.mode || forecastResult?.engine || forecastResult?.mode || point?.modelFamily || "UNAVAILABLE";
   if (mode === "CHRONOS_BOLT_ZERO_SHOT") return "Pretrained AI Forecast";
-  if (mode === "OPEN_METEO_PROVIDER_FORECAST") return "Atmospheric Provider Forecast";
+  if (mode === "OPEN_METEO_PROVIDER_FORECAST") return "Atmospheric Forecast";
   if (mode === "PERSISTENCE_FALLBACK") return "Persistence Fallback";
   if (mode === "UNAVAILABLE") return "Forecast Unavailable";
   if (mode.startsWith("ML_") || point?.modelPromotionStatus === "PROMOTED" || point?.promotionStatus === "PROMOTED") {
@@ -259,7 +268,7 @@ function engineLabel(point, forecastResult) {
   if (mode === "TREND_WEATHER_V1") return "Trend + Weather";
   if (mode === "PERSISTENCE" || mode === "PERSISTENCE_FALLBACK") return "Persistence Fallback";
   if (mode === "UNAVAILABLE" || point?.predictedAqi == null) return "Unavailable";
-  return labelize(mode);
+  return enumLabel(mode);
 }
 
 function isProviderForecastPoint(point, forecastResult) {
@@ -807,10 +816,10 @@ function OverviewPage({ context }) {
 
 function CommandCenterBottomCards({ context }) {
   const decision = context.decision || {};
-  const forecastPoints = getForecastPoints(decision.forecast);
+  const health = normalizeOperationalHealth(decision, context.timeline, Boolean(context.error));
   return (
     <MotionCard className="uqi-panel uqi-utility-summary-card">
-      <PanelHeader eyebrow="Quick Actions" title="Operational status" chip={decision.engineStatus?.degradedMode ? "Degraded" : "Ready"} />
+      <PanelHeader eyebrow="Quick Actions" title="Operational status" chip={health.status} />
       <div className="uqi-quick-actions">
         <Link to="/gov/alerts">Broadcast alert</Link>
         <Link to="/gov/reports">Open report</Link>
@@ -818,9 +827,9 @@ function CommandCenterBottomCards({ context }) {
         <Link to="/gov/maps">Open map</Link>
       </div>
       <div className="uqi-status-rows">
-        <span><i className="tone-low" /><b>Data ingestion</b><strong>{decision.environmentalSignals?.aqiAvailable === false ? "Unavailable" : "Online"}</strong></span>
+        <span><i className="tone-low" /><b>Data ingestion</b><strong>{decision.environmentalSignals?.aqiAvailable === false ? "Evidence not available" : "Online"}</strong></span>
         <span><i className={context.error ? "tone-critical" : "tone-low"} /><b>API services</b><strong>{context.error ? "Attention" : "Healthy"}</strong></span>
-        <span><i className="tone-neutral" /><b>Forecast horizons</b><strong>{forecastPoints.length || "Unavailable"}</strong></span>
+        <span><i className="tone-low" /><b>Forecast horizons</b><strong>{health.forecastHorizonCount || "Evidence not available"}</strong></span>
         <span><i className="tone-low" /><b>Last sync</b><strong>{context.generatedAt}</strong></span>
       </div>
     </MotionCard>
@@ -834,14 +843,18 @@ function HealthAdvisoryPreview({ decision }) {
   const audience = advisoryAudienceKey(first);
   return (
     <MotionCard className="uqi-panel uqi-health-preview">
-      <PanelHeader eyebrow="Health Advisory" title={advisoryTitle(first, audience)} chip={labelize(advisory.riskLevel || first.severity || "Low risk")} />
+      <PanelHeader eyebrow="Health Advisory" title="Health advisory" chip={enumLabel(advisory.riskLevel || first.severity || "MODERATE", "Moderate precautions")} />
+      <div className="uqi-tag-list">
+        <span>{audience === "Asthma/COPD" ? "Respiratory-risk groups" : audience}</span>
+        <span>{enumLabel(first.severity || advisory.riskLevel || "MODERATE", "Moderate precautions")}</span>
+      </div>
       <p className="uqi-note">{advisoryGuidance(first)}</p>
       <div className="uqi-audience-row">
-        {["General", "Children", "Elderly", "Respiratory"].map((label) => (
+        {["General public", "Children", "Elderly", "Respiratory-risk", "Pregnant people", "Outdoor workers"].map((label) => (
           <span key={label}>{label}</span>
         ))}
       </div>
-      <Link className="uqi-inline-action" to="/gov/health-advisory">View guidelines →</Link>
+      <Link className="uqi-inline-action" to="/gov/health-advisory">View guidelines</Link>
     </MotionCard>
   );
 }
@@ -987,11 +1000,8 @@ function SourceAnalysisPage({ context }) {
 }
 
 function EnforcementPage({ context }) {
-  const enforcement = context.decision?.enforcement || {};
-  const priorityActions = asArray(context.decision?.priorityActions);
-  const actions = asArray(enforcement.actions || enforcement.recommendedActions || enforcement.recommendations);
-  const agencies = asArray(enforcement.agencies || enforcement.responsibleAgencies);
-  const tasks = actions.length > 0 ? actions : priorityActions;
+  const enforcement = normalizeEnforcement(context.decision);
+  const tasks = enforcement.recommendations.length > 0 ? enforcement.recommendations : asArray(context.decision?.priorityActions);
 
   return (
     <div className="uqi-page-stack">
@@ -1001,21 +1011,21 @@ function EnforcementPage({ context }) {
         note="This page only renders the existing enforcement response. It does not trigger enforcement workflow changes."
       />
       <section className="uqi-enforcement-grid">
-        <MetricCard label="Priority" value={labelize(enforcement.priority || enforcement.severity, "Unavailable")} tone="medium" />
-        <MetricCard label="Agencies" value={agencies.length || "Unavailable"} tone="low" />
-        <MetricCard label="Actions" value={tasks.length || "Unavailable"} tone="neutral" />
-        <MetricCard label="Confidence" value={confidenceText(enforcement.confidence)} tone="low" />
+        <MetricCard label="Priority" value={enforcement.priority} tone="medium" />
+        <MetricCard label="Agencies" value={enforcement.agencyStatus} tone="low" />
+        <MetricCard label="Actions" value={tasks.length || "No immediate enforcement required"} tone="neutral" />
+        <MetricCard label="Confidence" value={enforcement.confidenceText} tone="low" />
       </section>
       <section className="uqi-panel">
         <PanelHeader eyebrow="Recommended Actions" title="Actionable enforcement items" chip={`${tasks.length} items`} />
         <ActionList items={tasks} empty="No enforcement actions were returned for this snapshot." variant="enforcement" />
       </section>
       <section className="uqi-panel">
-        <PanelHeader eyebrow="Agency Coordination" title="Responsible teams" chip={`${agencies.length} agencies`} />
-        {agencies.length === 0 ? (
-          <EmptyLine text="No agency assignments were returned." />
+        <PanelHeader eyebrow="Agency Coordination" title="Responsible teams" chip={enforcement.agencyStatus} />
+        {enforcement.agencies.length === 0 ? (
+          <EmptyLine text={enforcement.agencyStatus} />
         ) : (
-          <div className="uqi-tag-list">{agencies.map((agency) => <span key={toDisplayText(agency)}>{toDisplayText(agency)}</span>)}</div>
+          <div className="uqi-tag-list">{enforcement.agencies.map((agency) => <span key={toDisplayText(agency)}>{toDisplayText(agency)}</span>)}</div>
         )}
       </section>
     </div>
@@ -1305,35 +1315,32 @@ function CitySummaryCard({ decision }) {
 }
 
 function RiskDecisionCard({ decision, activeFrame }) {
-  const summary = decision?.summary || {};
-  const risk = decision?.riskAssessment || {};
+  const risk = normalizeRiskDecision(decision);
   return (
     <MotionCard className="uqi-panel uqi-risk-decision-card">
-      <PanelHeader eyebrow="Risk and Decision" title={labelize(risk.riskLevel || risk.level, "Risk unavailable")} chip={activeFrame?.label || "Live"} />
-      <p className="uqi-lead">{toDisplayText(summary.whatShouldOfficialsDoNow || risk.recommendation, "No immediate action summary returned.")}</p>
+      <PanelHeader eyebrow="Risk and Decision" title={risk.available ? risk.riskLevel : "Evidence not available"} chip={activeFrame?.label || "Live"} />
+      <p className="uqi-lead">{risk.decisionSummary}</p>
       <div className="uqi-tag-list">
-        {asArray(risk.keyDrivers || risk.drivers || decision?.priorityActions).slice(0, 5).map((item, index) => (
-          <span key={`${toDisplayText(item)}-${index}`}>{toDisplayText(item)}</span>
-        ))}
+        <span>Current AQI {risk.currentAqi ?? "not available"}</span>
+        <span>Peak forecast AQI {risk.peakForecastAqi ?? "not available"}</span>
+        <span>{risk.trend}</span>
       </div>
     </MotionCard>
   );
 }
 
 function EnforcementSummaryCard({ decision }) {
-  const enforcement = decision?.enforcement || {};
+  const enforcement = normalizeEnforcement(decision);
   const moduleStatus = statusFor(decision, "enforcement");
   const priorityActions = asArray(decision?.priorityActions);
-  const actions = asArray(enforcement.actions || enforcement.recommendedActions || enforcement.recommendations);
-  const agencies = asArray(enforcement.agencies || enforcement.responsibleAgencies);
-  const items = (actions.length > 0 ? actions : priorityActions).slice(0, 3);
+  const items = (enforcement.recommendations.length > 0 ? enforcement.recommendations : priorityActions).slice(0, 3);
   return (
     <MotionCard className="uqi-panel uqi-enforcement-summary-card">
-      <PanelHeader eyebrow="Enforcement Summary" title={labelize(enforcement.priority || enforcement.severity, "Action queue")} chip={items.length ? `${items.length} items` : moduleStatusLabel(moduleStatus, "Limited status")} />
+      <PanelHeader eyebrow="Enforcement Summary" title={enforcement.actionLabel} chip={items.length ? `${items.length} item${items.length === 1 ? "" : "s"}` : moduleStatusLabel(moduleStatus, "Limited status")} />
       <div className="uqi-status-rows">
-        <span><i className="tone-medium" /><b>Actions</b><strong>{items.length || "Unavailable"}</strong></span>
-        <span><i className="tone-low" /><b>Agencies</b><strong>{agencies.length || "Unavailable"}</strong></span>
-        <span><i className="tone-neutral" /><b>Confidence</b><strong>{confidenceText(enforcement.confidence ?? moduleStatus?.confidence)}</strong></span>
+        <span><i className="tone-medium" /><b>Priority</b><strong>{enforcement.priority}</strong></span>
+        <span><i className="tone-low" /><b>Agencies</b><strong>{enforcement.agencyStatus}</strong></span>
+        <span><i className="tone-neutral" /><b>Confidence</b><strong>{enforcement.confidenceText}</strong></span>
       </div>
       {!items.length && <p className="uqi-note">{moduleStatusReason(moduleStatus, "No enforcement actions were returned.")}</p>}
       <ActionList items={items} empty="No enforcement actions were returned." compact />
@@ -1343,23 +1350,24 @@ function EnforcementSummaryCard({ decision }) {
 }
 
 function CollectorModelStatusCard({ decision, timeline }) {
-  const forecast = decision?.forecast || {};
-  const points = getForecastPoints(forecast);
-  const promoted = points.filter((point) => point.modelPromotionStatus === "PROMOTED" || point.promotionStatus === "PROMOTED").length;
-  const fallback = points.filter(hasFallbackDiagnostics).length;
-  const diagnostic = toDisplayText(decision?.engineStatus?.message, "No collector/model diagnostic message was returned.");
+  const health = normalizeOperationalHealth(decision, timeline);
+  const diagnostic = toDisplayText(decision?.engineStatus?.message, "Core providers are online; optional model diagnostics are available below.");
   return (
     <MotionCard className="uqi-panel uqi-system-health-card">
-      <PanelHeader eyebrow="Collector and Model Status" title="Live engine health" chip={decision?.engineStatus?.degradedMode ? "Degraded" : "Stable"} />
+      <PanelHeader eyebrow="Collector and Model Status" title="Live engine health" chip={health.status} />
       <div className="uqi-status-rows">
-        <span><i className="tone-low" /><b>Provider status</b><strong>{decision?.environmentalSignals?.aqiAvailable === false ? "Unavailable" : "Online"}</strong></span>
-        <span><i className={promoted > 0 ? "tone-low" : "tone-neutral"} /><b>Promoted ML horizons</b><strong>{promoted}</strong></span>
-        <span><i className={fallback > 0 ? "tone-medium" : "tone-low"} /><b>Fallback horizons</b><strong>{fallback}</strong></span>
-        <span><i className="tone-neutral" /><b>Timeline frames</b><strong>{asArray(timeline?.frames).length}</strong></span>
+        <span><i className="tone-low" /><b>Provider forecast</b><strong>{health.providerForecast}</strong></span>
+        <span><i className="tone-low" /><b>Forecast horizons</b><strong>{health.forecastHorizonCount}</strong></span>
+        <span><i className="tone-low" /><b>Timeline frames</b><strong>{health.timelineFrameCount}</strong></span>
+        <span><i className="tone-neutral" /><b>Optional AI model</b><strong>{health.optionalAiModel}</strong></span>
       </div>
       <p className="uqi-note uqi-line-clamp-3">{diagnostic}</p>
       <details className="uqi-details uqi-compact-details">
-        <summary>View details</summary>
+        <summary>View diagnostics</summary>
+        <dl className="uqi-definition-grid">
+          <div><dt>Locally promoted model horizons</dt><dd>{health.promotedHorizonCount}</dd></div>
+          <div><dt>Persistence fallback horizons</dt><dd>{health.persistenceFallbackHorizonCount}</dd></div>
+        </dl>
         <p className="uqi-note">{diagnostic}</p>
       </details>
     </MotionCard>
@@ -1367,24 +1375,23 @@ function CollectorModelStatusCard({ decision, timeline }) {
 }
 
 function LiveForecastCard({ forecastResult, moduleStatus, compact = false }) {
-  const points = getForecastPoints(forecastResult);
+  const forecast = normalizeForecast(forecastResult);
+  const points = forecast.points;
   const fallbackPoints = points.filter(hasFallbackDiagnostics);
-  const providerForecast = points.some((point) => isProviderForecastPoint(point, forecastResult));
+  const providerForecast = forecast.providerForecast;
   const firstStationName = forecastResult?.stationName || points.find((point) => point.stationName)?.stationName;
-  const forecastProvider = points.find((point) => point.provider)?.provider || forecastResult?.provider;
   return (
     <MotionCard className={`uqi-panel uqi-forecast-card-shell ${compact ? "is-compact" : ""}`}>
       <PanelHeader
         eyebrow="Live Forecast"
         title="24h / 48h / 72h outlook"
-        chip={moduleStatusLabel(moduleStatus, engineLabel({ engine: forecastResult?.engine || forecastResult?.mode, modelVersion: forecastResult?.modelVersion }, forecastResult))}
+        chip={forecast.available ? forecast.engineLabel : moduleStatusLabel(moduleStatus, "Forecast evidence not available")}
       />
       <p className="uqi-note">
         {providerForecast
           ? "Coordinate forecast from the atmospheric provider for the selected location."
           : `Station forecast only: ${toDisplayText(firstStationName, "Unknown station")}.`}
-        {!compact && <> Current provider {labelize(forecastResult?.currentProvider, "unavailable")}; forecast provider {labelize(forecastProvider, "unavailable")}; forecast standard {labelize(forecastResult?.forecastStandard, "unavailable")}.</>}
-        {!compact && moduleStatus ? <> {moduleStatusReason(moduleStatus)}</> : null}
+        {!compact && <> Current provider {enumLabel(forecastResult?.currentProvider, "provider evidence not available")}; forecast provider {forecast.providerLabel}; forecast standard {enumLabel(forecast.standard, "AQI standard unavailable")}.</>}
       </p>
       {!compact && fallbackPoints.length > 0 && (
         <div className="uqi-warning-banner" role="status">
@@ -1446,20 +1453,22 @@ function ForecastChart({ points, currentAqi }) {
 
 function ForecastHorizonCard({ point, forecastResult, compact }) {
   const unavailable = point.predictedAqi === null || point.predictedAqi === undefined || point.predictedAqi === "";
+  const forecast = normalizeForecast(forecastResult);
+  const standard = enumLabel(point.aqiStandard || forecast.standard, "AQI standard unavailable");
   return (
     <article className={`uqi-horizon-card tone-${getAqiTone(point.predictedAqi)} ${unavailable ? "is-unavailable" : ""}`}>
       <div className="uqi-horizon-card__top">
-        <strong>{point.key}</strong>
+        <strong>{point.key} forecast</strong>
         <StatusBadge tone={unavailable ? "neutral" : getAqiTone(point.predictedAqi)} label={engineLabel(point, forecastResult)} />
       </div>
       <div className="uqi-horizon-card__value" title={unavailable ? "Unavailable" : undefined}>{compact && unavailable ? "N/A" : formatAqi(point.predictedAqi)}</div>
-      {compact && <span className="uqi-horizon-compact-meta">{confidenceText(point.confidence)}</span>}
+      <span className="uqi-horizon-compact-meta">{enumLabel(getAqiTone(point.predictedAqi), "Risk unavailable")} | {standard}</span>
       {!compact && (
         <dl className="uqi-definition-grid">
           <div><dt>Range</dt><dd>{point.lowerBound == null || point.upperBound == null ? "Unavailable" : `${formatAqi(point.lowerBound)}-${formatAqi(point.upperBound)}`}</dd></div>
           <div><dt>Confidence</dt><dd>{confidenceText(point.confidence)}</dd></div>
-          <div><dt>Model</dt><dd>{toDisplayText(point.modelVersion || point.modelFamily, "Unavailable")}</dd></div>
-          <div><dt>Promotion</dt><dd>{labelize(point.modelPromotionStatus || point.promotionStatus, "Unavailable")}</dd></div>
+          <div><dt>Forecast</dt><dd>{engineLabel(point, forecastResult)}</dd></div>
+          <div><dt>Standard</dt><dd>{standard}</dd></div>
         </dl>
       )}
       {!compact && (
@@ -1468,13 +1477,13 @@ function ForecastHorizonCard({ point, forecastResult, compact }) {
           <dl className="uqi-definition-grid">
             <div>
               <dt>{hasFallbackDiagnostics(point) ? "Fallback reason" : "Limitation"}</dt>
-              <dd>{fallbackReasonLabel(point.fallbackReason || asArray(point.insufficiencyReasons)[0]) || "No limitation reported"}</dd>
+              <dd>{forecast.providerForecast && point.fallbackReason === "CHRONOS_DISABLED" ? forecast.optionalModelNote : fallbackReasonLabel(point.fallbackReason || asArray(point.insufficiencyReasons)[0]) || "No limitation reported"}</dd>
             </div>
             <div><dt>History</dt><dd>{toDisplayText(point.validObservationCount, "0")} observations / {toDisplayText(point.coverageHours, "0")} hours</dd></div>
             <div><dt>Target time</dt><dd>{formatDateTime(point.targetTime)}</dd></div>
-            <div><dt>Standard</dt><dd>{labelize(point.aqiStandard || forecastResult?.forecastStandard, "Unavailable")}</dd></div>
-            <div><dt>Provider</dt><dd>{labelize(point.provider || forecastResult?.provider || forecastResult?.currentProvider, "Unavailable")}</dd></div>
-            <div><dt>Scope</dt><dd>{labelize(point.forecastScope, "Unavailable")}</dd></div>
+            <div><dt>Engine</dt><dd>{enumLabel(point.engine || point.mode, "Forecast engine unavailable")}</dd></div>
+            <div><dt>Provider</dt><dd>{enumLabel(point.provider || forecastResult?.provider || forecastResult?.currentProvider, "Provider evidence not available")}</dd></div>
+            <div><dt>Scope</dt><dd>{enumLabel(point.forecastScope, "Forecast scope unavailable")}</dd></div>
             <div><dt>Baseline</dt><dd>{formatAqi(point.baselinePredictedAqi)}</dd></div>
           </dl>
           <p className="uqi-note">{toDisplayText(point.explanation || point.meteorologicalInfluence, "No forecast explanation returned.")}</p>
@@ -1716,13 +1725,15 @@ function HistoricalReplayCard({ expanded = false }) {
 }
 
 function SourceAttributionCard({ attribution, compact = false }) {
-  const sources = asArray(attribution?.sources);
+  const normalized = normalizeAttribution(attribution);
+  const sources = normalized.sources;
   const displayedSources = compact ? sources.slice(0, 2) : sources;
   const hiddenCount = Math.max(0, sources.length - displayedSources.length);
-  const dominantSource = attribution?.dominantSource;
+  const leading = normalized.leadingSource;
   return (
     <section className={`uqi-panel uqi-source-attribution-card ${compact ? "is-compact" : ""}`}>
-      <PanelHeader eyebrow="Source Attribution" title={labelize(dominantSource, "Dominant source unavailable")} chip={confidenceText(attribution?.overallConfidence)} />
+      <PanelHeader eyebrow="Leading source" title={leading?.sourceLabel || "Evidence not available"} chip={leading?.contributionText || "Contribution unavailable"} />
+      <p className="uqi-note">Overall confidence: {normalized.confidenceText}. Total contribution shown: {normalized.totalContribution}%.</p>
       <p className="uqi-note">{toDisplayText(attribution?.explanation, "Attribution explanation was not included in the decision response.")}</p>
       <p className="uqi-disclaimer">Source contributions are model-based estimates from available evidence. Unknown and missing evidence are preserved instead of hidden.</p>
       <div className="uqi-source-bars">
@@ -1738,23 +1749,22 @@ function SourceAttributionCard({ attribution, compact = false }) {
 }
 
 function SourceRow({ source, compact }) {
-  const rawPercent = source?.estimatedContributionPercent ?? source?.percentage ?? source?.contributionPercent;
-  const percent = rawPercent === null || rawPercent === undefined || rawPercent === "" ? null : Number(rawPercent);
+  const percent = source.contribution;
   const safePercent = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
   const evidence = asArray(source.supportingEvidence || source.evidence);
   return (
     <article className="uqi-source-row">
       <div className="uqi-source-row__top">
         <div>
-          <strong>{toDisplayText(source.displayName, labelize(source.sourceType))}</strong>
-          <span>{confidenceText(source.confidence)} confidence</span>
+          <strong>{source.sourceLabel || enumLabel(source.displayName || source.sourceType)}</strong>
+          <span>{source.confidenceText || confidenceText(source.confidence)} confidence</span>
         </div>
-        <b>{Number.isFinite(percent) ? `${Math.round(percent)}%` : "Unknown"}</b>
+        <b>{source.contributionText || "Evidence not available"}</b>
       </div>
       <div className="uqi-source-bar"><span style={{ width: `${safePercent}%` }} /></div>
       <div className="uqi-tag-list">
-        <span>{labelize(source.dataOrigin || "derived_estimate")}</span>
-        <span>{labelize(source.dataAvailability || "partial")}</span>
+        <span>{source.dataOriginLabel}</span>
+        <span>{source.availabilityLabel}</span>
         <span>{evidence.length} evidence</span>
       </div>
       {!compact && (
@@ -1801,7 +1811,7 @@ function ActionList({ items, empty, compact = false }) {
     <div className={`uqi-action-list ${compact ? "is-compact" : ""}`}>
       {rows.map((item, index) => (
         <article className="uqi-action-item" key={`${toDisplayText(item)}-${index}`}>
-          <strong>{toDisplayText(item.title || item.actionType || item.action || item.name || item, `Item ${index + 1}`)}</strong>
+          <strong>{item?.title || item?.actionLabel || enumLabel(item?.actionType || item?.action || item?.name || item, `Item ${index + 1}`)}</strong>
           <span>{actionDetailText(item)}</span>
           {asArray(item?.limitations).length > 0 ? (
             <small>{asArray(item.limitations).map((limitation) => toDisplayText(limitation)).join("; ")}</small>

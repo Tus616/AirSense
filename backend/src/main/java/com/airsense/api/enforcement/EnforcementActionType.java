@@ -10,5 +10,6 @@ public enum EnforcementActionType {
     HEALTH_DEPARTMENT_ALERT,
     PUBLIC_ADVISORY,
     GREEN_BUFFER_ACTION,
+    MONITORING,
     NO_ACTION_REQUIRED
 }

@@ -75,7 +75,7 @@ export function forecastEngineLabel(value, fallback = "Forecast unavailable") {
   const key = String(value || "").trim().toUpperCase();
   const labels = {
     CHRONOS_BOLT_ZERO_SHOT: "Pretrained AI Forecast",
-    OPEN_METEO_PROVIDER_FORECAST: "Atmospheric Provider Forecast",
+    OPEN_METEO_PROVIDER_FORECAST: "Atmospheric Forecast",
     PERSISTENCE_FALLBACK: "Persistence Fallback",
     PERSISTENCE: "Persistence Fallback",
     TREND_WEATHER_V1: "Trend + Weather",
@@ -112,9 +112,9 @@ export function fallbackReasonLabel(reason, engine = "") {
     .map((part) => {
       const key = part.trim();
       if (key === "CHRONOS_DISABLED" && engineKey === "OPEN_METEO_PROVIDER_FORECAST") {
-        return "Chronos skipped; provider forecast used";
+        return "Optional AI model not used";
       }
-      if (key === "CHRONOS_DISABLED") return "Pretrained model disabled";
+      if (key === "CHRONOS_DISABLED") return "Optional AI model not used";
       return labels[key] || labelize(key, "No fallback reason reported");
     })
     .join(" / ");

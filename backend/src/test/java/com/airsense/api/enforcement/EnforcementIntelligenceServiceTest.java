@@ -137,7 +137,7 @@ class EnforcementIntelligenceServiceTest {
     }
 
     @Test
-    void lowAqiReturnsNoActionRequired() {
+    void lowAqiReturnsMonitoringRecommendation() {
         EnforcementResult result = service.recommend(
                 context("MYSURU", 72).build(),
                 attribution("MYSURU", PollutionSourceType.UNKNOWN, 0.30),
@@ -146,7 +146,12 @@ class EnforcementIntelligenceServiceTest {
         );
 
         assertThat(result.getRecommendations()).hasSize(1);
-        assertThat(result.getRecommendations().get(0).getActionType()).isEqualTo(EnforcementActionType.NO_ACTION_REQUIRED);
+        EnforcementRecommendation recommendation = result.getRecommendations().get(0);
+        assertThat(recommendation.getActionType()).isEqualTo(EnforcementActionType.MONITORING);
+        assertThat(recommendation.getActionLabel()).isEqualTo("No immediate enforcement required");
+        assertThat(recommendation.getAgencyStatus()).isEqualTo("NOT_REQUIRED");
+        assertThat(recommendation.getForecastAvailable()).isTrue();
+        assertThat(recommendation.getReason()).doesNotContain("forecast is unavailable");
     }
 
     @Test
@@ -160,7 +165,7 @@ class EnforcementIntelligenceServiceTest {
 
         assertThat(result.getRecommendations()).isNotEmpty();
         assertThat(result.getRecommendations().get(0).getActionType())
-                .isIn(EnforcementActionType.PUBLIC_ADVISORY, EnforcementActionType.NO_ACTION_REQUIRED);
+                .isIn(EnforcementActionType.PUBLIC_ADVISORY, EnforcementActionType.MONITORING, EnforcementActionType.NO_ACTION_REQUIRED);
         assertThat(result.getRecommendations().get(0).getConfidence()).isLessThanOrEqualTo(0.30);
     }
 

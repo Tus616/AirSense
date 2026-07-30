@@ -16,6 +16,11 @@ public class EngineStatus {
     private String fusionStatus;
     private String attributionStatus;
     private String forecastStatus;
+    private String providerForecastStatus;
+    private int forecastHorizonCount;
+    private int locallyPromotedModelHorizonCount;
+    private int persistenceFallbackHorizonCount;
+    private String optionalAiModelStatus;
     private String enforcementStatus;
     private String advisoryStatus;
     private boolean degradedMode;

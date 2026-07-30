@@ -1,4 +1,5 @@
 import { asArray, formatPercent, formatScore, labelize, toDisplayText } from "./decisionUtils";
+import { enumLabel } from "../../services/decisionNormalization";
 
 export default function EnforcementActions({ enforcement, priorityActions }) {
   const recommendations = asArray(enforcement?.recommendations).slice(0, 7);
@@ -25,13 +26,13 @@ export default function EnforcementActions({ enforcement, priorityActions }) {
               </div>
               <div className="decision-action-card__body">
                 <div className="decision-action-card__title">
-                  <h3>{labelize(item.actionType)}</h3>
+                  <h3>{item.title || item.actionLabel || enumLabel(item.actionType, "Enforcement action")}</h3>
                   <span>{formatPercent(item.confidence)}</span>
                 </div>
                 <p>{toDisplayText(item.reason, "No reason returned.")}</p>
                 <div className="decision-meta-grid">
                   <span>Agency</span>
-                  <strong>{item.responsibleAgency || "Unassigned"}</strong>
+                  <strong>{item.agencyStatus === "NOT_REQUIRED" ? "No agency escalation required" : item.responsibleAgency || "Agency assignment pending"}</strong>
                   <span>Target</span>
                   <strong>{toDisplayText(item.targetArea || item.wardId, "Citywide")}</strong>
                   <span>Urgency</span>
@@ -39,7 +40,7 @@ export default function EnforcementActions({ enforcement, priorityActions }) {
                   <span>Window</span>
                   <strong>{toDisplayText(item.actionWindow, "Unspecified")}</strong>
                   <span>Forecast</span>
-                  <strong>{labelize(item.forecastEngine, "Unavailable")}</strong>
+                  <strong>{enumLabel(item.forecastEngine, "Forecast evidence not available")}</strong>
                 </div>
                 <div className="decision-tag-row">
                   {asArray(item.datasetsUsed).map((dataset) => (

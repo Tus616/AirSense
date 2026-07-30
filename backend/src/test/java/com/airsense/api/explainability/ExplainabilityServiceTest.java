@@ -89,14 +89,14 @@ class ExplainabilityServiceTest {
 
         ExplainabilityResult result = service.explain(decision);
 
-        assertThat(result.getReasoning()).anyMatch(step -> step.getStatement().contains("Atmospheric Provider Forecast predicts AQI"));
-        assertThat(result.getEvidence()).anyMatch(item -> item.getProvider().equals("Atmospheric Provider Forecast"));
-        assertThat(result.getModelExplanations()).anyMatch(model -> model.getModelName().equals("Atmospheric Provider Forecast")
+        assertThat(result.getReasoning()).anyMatch(step -> step.getStatement().contains("Atmospheric Forecast predicts AQI"));
+        assertThat(result.getEvidence()).anyMatch(item -> item.getProvider().equals("Atmospheric Forecast"));
+        assertThat(result.getModelExplanations()).anyMatch(model -> model.getModelName().equals("Atmospheric Forecast")
                 && model.getRulesFired().contains("provider_forecast_used")
                 && !model.getRulesFired().contains("model_prediction_used")
                 && model.getExplanation().contains("not a locally trained/promoted ML model"));
         assertThat(result.getLimitations()).contains("Forecast is an atmospheric provider forecast, not a locally trained/promoted model.");
-        assertThat(result.getExplanation()).contains("atmospheric provider forecast peak");
+        assertThat(result.getExplanation()).contains("atmospheric forecast peak");
     }
 
     @Test
